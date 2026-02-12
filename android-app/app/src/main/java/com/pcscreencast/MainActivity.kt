@@ -29,6 +29,10 @@ class MainActivity : AppCompatActivity() {
     private var streamJob: Job? = null
     private var frameCount = 0
     private var webSocketStream: WebSocketStream? = null
+    private var fullCaptureWidth = 0
+    private var fullCaptureHeight = 0
+    private var currentCropRegion: IntArray? = null
+    private var lastSentViewport: IntArray? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -63,6 +67,10 @@ class MainActivity : AppCompatActivity() {
         Log.d(TAG, "Connecting to $url")
         streamJob?.cancel()
         frameCount = 0
+        fullCaptureWidth = 0
+        fullCaptureHeight = 0
+        currentCropRegion = null
+        lastSentViewport = null
         showConnecting(true, getString(R.string.connecting))
         val stream = WebSocketStream(url)
         webSocketStream = stream
@@ -80,11 +88,19 @@ class MainActivity : AppCompatActivity() {
                     .collect { bitmap: Bitmap? ->
                         runOnUiThread {
                             if (bitmap != null) {
-                                if (frameCount++ == 0) {
+                                val isFirst = frameCount++ == 0
+                                if (isFirst) {
                                     Log.d(TAG, "First frame, streaming")
+                                    fullCaptureWidth = bitmap.width
+                                    fullCaptureHeight = bitmap.height
+                                    currentCropRegion = intArrayOf(0, 0, bitmap.width, bitmap.height)
+                                    lastSentViewport = intArrayOf(0, 0, bitmap.width, bitmap.height)
+                                    stream.sendViewport(0, 0, bitmap.width, bitmap.height)
                                     (binding.imageStream as? ZoomableStreamView)?.onControl = { type, x, y, button ->
                                         stream.sendControl(type, x, y, button)
                                     }
+                                } else {
+                                    currentCropRegion = lastSentViewport?.copyOf()
                                 }
                                 showStreaming(true)
                                 (binding.imageStream.drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap?.let { old ->
@@ -92,6 +108,27 @@ class MainActivity : AppCompatActivity() {
                                 }
                                 binding.imageStream.setImageBitmap(bitmap)
                                 binding.imageStream.invalidate()
+                                if (!isFirst) {
+                                    val streamView = binding.imageStream as? ZoomableStreamView
+                                    val crop = currentCropRegion
+                                    if (streamView != null && crop != null && fullCaptureWidth > 0 && fullCaptureHeight > 0) {
+                                        val isCrop = bitmap.width < fullCaptureWidth || bitmap.height < fullCaptureHeight
+                                        val viewportToSend = when {
+                                            isCrop && streamView.scale < 0.9f -> intArrayOf(0, 0, fullCaptureWidth, fullCaptureHeight)
+                                            isCrop -> crop
+                                            else -> {
+                                                val visible = streamView.getVisibleViewport() ?: return@runOnUiThread
+                                                val fullX = (crop[0] + visible[0]).coerceIn(0, fullCaptureWidth - 1)
+                                                val fullY = (crop[1] + visible[1]).coerceIn(0, fullCaptureHeight - 1)
+                                                val fullW = visible[2].coerceIn(1, fullCaptureWidth - fullX)
+                                                val fullH = visible[3].coerceIn(1, fullCaptureHeight - fullY)
+                                                intArrayOf(fullX, fullY, fullW, fullH)
+                                            }
+                                        }
+                                        lastSentViewport = viewportToSend
+                                        stream.sendViewport(viewportToSend[0], viewportToSend[1], viewportToSend[2], viewportToSend[3])
+                                    }
+                                }
                             } else {
                                 Log.w(TAG, "Stream ended or error (bitmap=null)")
                                 showStreaming(false)

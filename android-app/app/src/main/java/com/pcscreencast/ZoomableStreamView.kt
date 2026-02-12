@@ -20,7 +20,7 @@ class ZoomableStreamView @JvmOverloads constructor(
 ) : ImageView(context, attrs, defStyleAttr) {
 
     private val matrix = Matrix()
-    private var scale = 1f
+    private var _scale = 1f
     private var translateX = 0f
     private var translateY = 0f
     private var lastTouchX = 0f
@@ -32,8 +32,8 @@ class ZoomableStreamView @JvmOverloads constructor(
 
     private val scaleDetector = ScaleGestureDetector(context, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
         override fun onScale(detector: ScaleGestureDetector): Boolean {
-            scale *= detector.scaleFactor
-            scale = scale.coerceIn(minScale, maxScale)
+            _scale *= detector.scaleFactor
+            _scale = _scale.coerceIn(minScale, maxScale)
             invalidate()
             return true
         }
@@ -51,6 +51,7 @@ class ZoomableStreamView @JvmOverloads constructor(
     })
 
     var onControl: ((type: String, x: Int, y: Int, button: Int) -> Unit)? = null
+    val scale: Float get() = _scale
     var enableZoom = true
     var enableClicks = true
     var tapIsRightClick = false
@@ -58,6 +59,8 @@ class ZoomableStreamView @JvmOverloads constructor(
     init {
         scaleType = ScaleType.MATRIX
         setOnTouchListener { _, event ->
+            if (enableZoom) scaleDetector.onTouchEvent(event)
+            if (enableClicks) gestureDetector.onTouchEvent(event)
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
                     lastTouchX = event.x
@@ -69,7 +72,7 @@ class ZoomableStreamView @JvmOverloads constructor(
                         val dy = event.y - lastTouchY
                         lastTouchX = event.x
                         lastTouchY = event.y
-                        if (scale > 1f && enableZoom) {
+                        if (_scale > 1f && enableZoom) {
                             addPan(dx, dy)
                         } else if (enableClicks) {
                             sendMouse(event.x, event.y)
@@ -77,8 +80,6 @@ class ZoomableStreamView @JvmOverloads constructor(
                     }
                 }
             }
-            if (enableZoom) scaleDetector.onTouchEvent(event)
-            if (enableClicks) gestureDetector.onTouchEvent(event)
             true
         }
     }
@@ -95,9 +96,15 @@ class ZoomableStreamView @JvmOverloads constructor(
         val newW = bm?.width ?: 0
         val newH = bm?.height ?: 0
         if (newW != oldW || newH != oldH) {
-            scale = 1f
-            translateX = 0f
-            translateY = 0f
+            if (oldW == 0 && oldH == 0) {
+                _scale = 1f
+                translateX = 0f
+                translateY = 0f
+            } else if (newW > oldW || newH > oldH) {
+                _scale = 1f
+                translateX = 0f
+                translateY = 0f
+            }
         }
         applyMatrix()
     }
@@ -117,8 +124,8 @@ class ZoomableStreamView @JvmOverloads constructor(
         val dh = drawable.intrinsicHeight.toFloat()
         if (dw <= 0 || dh <= 0) return
         val fitScale = minOf(vw / dw, vh / dh)
-        val scaledW = dw * fitScale * scale
-        val scaledH = dh * fitScale * scale
+        val scaledW = dw * fitScale * _scale
+        val scaledH = dh * fitScale * _scale
         val maxTx = (scaledW - vw).coerceAtLeast(0f) / 2
         val maxTy = (scaledH - vh).coerceAtLeast(0f) / 2
         translateX = translateX.coerceIn(-maxTx, maxTx)
@@ -140,7 +147,7 @@ class ZoomableStreamView @JvmOverloads constructor(
         matrix.postScale(fitScale, fitScale)
         matrix.postTranslate(baseTx, baseTy)
         matrix.postTranslate(-vw / 2, -vh / 2)
-        matrix.postScale(scale, scale)
+        matrix.postScale(_scale, _scale)
         matrix.postTranslate(vw / 2 + translateX, vh / 2 + translateY)
         imageMatrix = matrix
     }
@@ -163,6 +170,31 @@ class ZoomableStreamView @JvmOverloads constructor(
         return Pair(bx, by)
     }
 
+    /** Returns visible region in drawable/bitmap coords: [left, top, width, height] */
+    fun getVisibleViewport(): IntArray? {
+        val drawable = drawable ?: return null
+        val inv = Matrix()
+        if (!imageMatrix.invert(inv)) return null
+        val dw = drawable.intrinsicWidth.toFloat()
+        val dh = drawable.intrinsicHeight.toFloat()
+        if (dw <= 0 || dh <= 0) return null
+        val vw = width.toFloat()
+        val vh = height.toFloat()
+        val pts = floatArrayOf(0f, 0f, vw, 0f, vw, vh, 0f, vh)
+        inv.mapPoints(pts)
+        val left = minOf(pts[0], pts[2], pts[4], pts[6])
+        val right = maxOf(pts[0], pts[2], pts[4], pts[6])
+        val top = minOf(pts[1], pts[3], pts[5], pts[7])
+        val bottom = maxOf(pts[1], pts[3], pts[5], pts[7])
+        val l = left.toInt().coerceIn(0, dw.toInt())
+        val t = top.toInt().coerceIn(0, dh.toInt())
+        val r = right.toInt().coerceIn(0, dw.toInt())
+        val b = bottom.toInt().coerceIn(0, dh.toInt())
+        val w = (r - l).coerceAtLeast(1)
+        val h = (b - t).coerceAtLeast(1)
+        return intArrayOf(l, t, w, h)
+    }
+
     private fun sendMouse(vx: Float, vy: Float) {
         val now = SystemClock.uptimeMillis()
         if (now - lastMouseSendTime < mouseThrottleMs) return
@@ -178,18 +210,18 @@ class ZoomableStreamView @JvmOverloads constructor(
 
     fun zoomIn() {
         if (!enableZoom) return
-        scale = (scale + 0.25f).coerceIn(minScale, maxScale)
+        _scale = (_scale + 0.25f).coerceIn(minScale, maxScale)
         invalidate()
     }
 
     fun zoomOut() {
         if (!enableZoom) return
-        scale = (scale - 0.25f).coerceIn(minScale, maxScale)
+        _scale = (_scale - 0.25f).coerceIn(minScale, maxScale)
         invalidate()
     }
 
     fun resetZoom() {
-        scale = 1f
+        _scale = 1f
         translateX = 0f
         translateY = 0f
         invalidate()

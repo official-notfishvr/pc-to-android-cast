@@ -70,4 +70,9 @@ class WebSocketStream(private val url: String) {
         val json = """{"t":"$type","x":$x,"y":$y,"b":$button}"""
         webSocketRef.get()?.send(json)
     }
+
+    fun sendViewport(x: Int, y: Int, w: Int, h: Int) {
+        val json = """{"t":"v","x":$x,"y":$y,"w":$w,"h":$h}"""
+        webSocketRef.get()?.send(json)
+    }
 }

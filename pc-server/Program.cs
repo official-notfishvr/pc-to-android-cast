@@ -37,8 +37,9 @@ server.Start(socket =>
         var bounds = SystemInformation.VirtualScreen;
         var cw = (int)(bounds.Width * scale);
         var ch = (int)(bounds.Height * scale);
-        socket.OnMessage = msg => HandleControl(msg, bounds.Width, bounds.Height, cw, ch);
-        _ = StreamFramesAsync(socket, ip);
+        var viewport = new ViewportState();
+        socket.OnMessage = msg => HandleControl(msg, bounds.Width, bounds.Height, cw, ch, viewport);
+        _ = StreamFramesAsync(socket, ip, cw, ch, viewport);
     };
     socket.OnClose = () =>
     {
@@ -70,18 +71,21 @@ Console.WriteLine();
 Console.ReadLine();
 server.Dispose();
 
-async Task StreamFramesAsync(IWebSocketConnection socket, string clientIp)
+async Task StreamFramesAsync(IWebSocketConnection socket, string clientIp, int captureWidth, int captureHeight, ViewportState viewport)
 {
     var bounds = SystemInformation.VirtualScreen;
-    var captureWidth = (int)(bounds.Width * scale);
-    var captureHeight = (int)(bounds.Height * scale);
     Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Capture: {captureWidth}x{captureHeight} for {clientIp}");
     using var bitmap = new Bitmap(captureWidth, captureHeight, PixelFormat.Format24bppRgb);
     using var g = Graphics.FromImage(bitmap);
 
-    var encoderParams = new EncoderParameters(1)
+    var encoderParamsFull = new EncoderParameters(1)
     {
         Param = { [0] = new EncoderParameter(System.Drawing.Imaging.Encoder.Quality, (long)quality) }
+    };
+    var viewportQuality = Math.Min(95, quality + 20);
+    var encoderParamsViewport = new EncoderParameters(1)
+    {
+        Param = { [0] = new EncoderParameter(System.Drawing.Imaging.Encoder.Quality, (long)viewportQuality) }
     };
 
     var frameCount = 0;
@@ -90,12 +94,39 @@ async Task StreamFramesAsync(IWebSocketConnection socket, string clientIp)
         while (true)
         {
             g.CopyFromScreen(bounds.X, bounds.Y, 0, 0, new Size(bounds.Width, bounds.Height), CopyPixelOperation.SourceCopy);
-            using var ms = new MemoryStream();
-            bitmap.Save(ms, encoder!, encoderParams);
-            var bytes = ms.ToArray();
+
+            int vx, vy, vw, vh;
+            lock (viewport.Lock)
+            {
+                vx = viewport.X; vy = viewport.Y; vw = viewport.W; vh = viewport.H;
+            }
+
+            byte[] bytes;
+            var threshold = 0.95;
+            var isZoomed = vw > 0 && vh > 0 && (vw < captureWidth * threshold || vh < captureHeight * threshold);
+
+            if (isZoomed)
+            {
+                vx = Math.Clamp(vx, 0, captureWidth - 1);
+                vy = Math.Clamp(vy, 0, captureHeight - 1);
+                vw = Math.Clamp(vw, 1, captureWidth - vx);
+                vh = Math.Clamp(vh, 1, captureHeight - vy);
+                var rect = new Rectangle(vx, vy, vw, vh);
+                using var crop = bitmap.Clone(rect, bitmap.PixelFormat);
+                using var ms = new MemoryStream();
+                crop.Save(ms, encoder!, encoderParamsViewport);
+                bytes = ms.ToArray();
+            }
+            else
+            {
+                using var ms = new MemoryStream();
+                bitmap.Save(ms, encoder!, encoderParamsFull);
+                bytes = ms.ToArray();
+            }
+
             frameCount++;
-            if (frameCount == 1) Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] First frame sent: {bytes.Length} bytes");
-            else if (frameCount % 60 == 0) Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Frame {frameCount}");
+            if (frameCount == 1) Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] First frame sent: {bytes.Length} bytes (viewport={isZoomed})");
+            else if (frameCount % 60 == 0) Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Frame {frameCount} (viewport={isZoomed})");
             socket.Send(bytes);
             await Task.Delay(interval);
         }
@@ -106,7 +137,7 @@ async Task StreamFramesAsync(IWebSocketConnection socket, string clientIp)
     }
 }
 
-static void HandleControl(string msg, int screenW, int screenH, int captureW, int captureH)
+static void HandleControl(string msg, int screenW, int screenH, int captureW, int captureH, ViewportState viewport)
 {
     try
     {
@@ -115,8 +146,31 @@ static void HandleControl(string msg, int screenW, int screenH, int captureW, in
         var t = root.TryGetProperty("t", out var tp) ? tp.GetString() : null;
         var x = root.TryGetProperty("x", out var xp) ? xp.GetInt32() : 0;
         var y = root.TryGetProperty("y", out var yp) ? yp.GetInt32() : 0;
-        var screenX = (int)(x * (double)screenW / captureW);
-        var screenY = (int)(y * (double)screenH / captureH);
+
+        if (t == "v")
+        {
+            var w = root.TryGetProperty("w", out var wp) ? wp.GetInt32() : captureW;
+            var h = root.TryGetProperty("h", out var hp) ? hp.GetInt32() : captureH;
+            lock (viewport.Lock)
+            {
+                viewport.X = x;
+                viewport.Y = y;
+                viewport.W = w;
+                viewport.H = h;
+            }
+            return;
+        }
+
+        int vpx, vpy;
+        lock (viewport.Lock)
+        {
+            vpx = viewport.X;
+            vpy = viewport.Y;
+        }
+        var captureX = vpx + x;
+        var captureY = vpy + y;
+        var screenX = (int)(captureX * (double)screenW / captureW);
+        var screenY = (int)(captureY * (double)screenH / captureH);
         screenX = Math.Clamp(screenX, 0, screenW - 1);
         screenY = Math.Clamp(screenY, 0, screenH - 1);
         if (t == "m") SetCursorPos(screenX, screenY);
@@ -187,4 +241,10 @@ static void RunNetsh(string args)
         RedirectStandardOutput = true
     });
     p?.WaitForExit(3000);
+}
+
+sealed class ViewportState
+{
+    public readonly object Lock = new();
+    public int X, Y, W, H;
 }
