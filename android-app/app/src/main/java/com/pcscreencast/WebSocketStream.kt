@@ -13,15 +13,18 @@ import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import okio.ByteString
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 
 /**
- * WebSocket stream that receives JPEG frames and emits Bitmaps.
+ * WebSocket stream that receives JPEG frames and can send control messages.
  */
 class WebSocketStream(private val url: String) {
 
     companion object {
         private const val TAG = "WebSocketStream"
     }
+
+    private val webSocketRef = AtomicReference<WebSocket?>(null)
 
     fun stream(): Flow<Bitmap?> = callbackFlow {
         Log.d(TAG, "Connecting to $url")
@@ -31,34 +34,40 @@ class WebSocketStream(private val url: String) {
             .writeTimeout(10, TimeUnit.SECONDS)
             .build()
         val request = Request.Builder().url(url).build()
-        var webSocket: WebSocket? = null
 
         val listener = object : WebSocketListener() {
-            override fun onOpen(webSocket: WebSocket, response: Response) {
+            override fun onOpen(ws: WebSocket, response: Response) {
+                webSocketRef.set(ws)
                 Log.d(TAG, "Connected")
             }
 
-            override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
+            override fun onMessage(ws: WebSocket, bytes: ByteString) {
                 val bmp = BitmapFactory.decodeByteArray(bytes.toByteArray(), 0, bytes.size)
                 if (bmp != null) trySend(bmp)
             }
 
-            override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
+            override fun onClosing(ws: WebSocket, code: Int, reason: String) {
                 trySend(null)
             }
 
-            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+            override fun onFailure(ws: WebSocket, t: Throwable, response: Response?) {
                 Log.e(TAG, "WebSocket error", t)
                 trySend(null)
             }
         }
 
-        webSocket = client.newWebSocket(request, listener)
+        val webSocket = client.newWebSocket(request, listener)
 
         awaitClose {
-            webSocket?.close(1000, null)
+            webSocketRef.set(null)
+            webSocket.close(1000, null)
             client.dispatcher.executorService.shutdown()
             client.connectionPool.evictAll()
         }
+    }
+
+    fun sendControl(type: String, x: Int, y: Int, button: Int = 0) {
+        val json = """{"t":"$type","x":$x,"y":$y,"b":$button}"""
+        webSocketRef.get()?.send(json)
     }
 }

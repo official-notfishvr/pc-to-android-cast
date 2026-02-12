@@ -1,0 +1,197 @@
+package com.pcscreencast
+
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.Matrix
+import android.util.AttributeSet
+import android.os.SystemClock
+import android.view.GestureDetector
+import android.view.MotionEvent
+import android.view.ScaleGestureDetector
+import android.widget.ImageView
+
+/**
+ * ImageView with pinch-to-zoom and touch-to-mouse support.
+ */
+class ZoomableStreamView @JvmOverloads constructor(
+    context: Context,
+    attrs: AttributeSet? = null,
+    defStyleAttr: Int = 0
+) : ImageView(context, attrs, defStyleAttr) {
+
+    private val matrix = Matrix()
+    private var scale = 1f
+    private var translateX = 0f
+    private var translateY = 0f
+    private var lastTouchX = 0f
+    private var lastTouchY = 0f
+    private var lastMouseSendTime = 0L
+    private val mouseThrottleMs = 30L
+    private var minScale = 0.5f
+    private var maxScale = 4f
+
+    private val scaleDetector = ScaleGestureDetector(context, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+        override fun onScale(detector: ScaleGestureDetector): Boolean {
+            scale *= detector.scaleFactor
+            scale = scale.coerceIn(minScale, maxScale)
+            invalidate()
+            return true
+        }
+    })
+
+    private val gestureDetector = GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
+        override fun onSingleTapUp(e: MotionEvent): Boolean {
+            sendClick(e.x, e.y, if (tapIsRightClick) 1 else 0)
+            return true
+        }
+
+        override fun onLongPress(e: MotionEvent) {
+            sendClick(e.x, e.y, if (tapIsRightClick) 0 else 1)
+        }
+    })
+
+    var onControl: ((type: String, x: Int, y: Int, button: Int) -> Unit)? = null
+    var enableZoom = true
+    var enableClicks = true
+    var tapIsRightClick = false
+
+    init {
+        scaleType = ScaleType.MATRIX
+        setOnTouchListener { _, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    lastTouchX = event.x
+                    lastTouchY = event.y
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    if (event.pointerCount == 1 && !scaleDetector.isInProgress) {
+                        val dx = event.x - lastTouchX
+                        val dy = event.y - lastTouchY
+                        lastTouchX = event.x
+                        lastTouchY = event.y
+                        if (scale > 1f && enableZoom) {
+                            addPan(dx, dy)
+                        } else if (enableClicks) {
+                            sendMouse(event.x, event.y)
+                        }
+                    }
+                }
+            }
+            if (enableZoom) scaleDetector.onTouchEvent(event)
+            if (enableClicks) gestureDetector.onTouchEvent(event)
+            true
+        }
+    }
+
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        applyMatrix()
+    }
+
+    override fun setImageBitmap(bm: Bitmap?) {
+        val oldW = drawable?.intrinsicWidth ?: 0
+        val oldH = drawable?.intrinsicHeight ?: 0
+        super.setImageBitmap(bm)
+        val newW = bm?.width ?: 0
+        val newH = bm?.height ?: 0
+        if (newW != oldW || newH != oldH) {
+            scale = 1f
+            translateX = 0f
+            translateY = 0f
+        }
+        applyMatrix()
+    }
+
+    private fun addPan(dx: Float, dy: Float) {
+        translateX += dx
+        translateY += dy
+        clampTranslation()
+        invalidate()
+    }
+
+    private fun clampTranslation() {
+        val drawable = drawable ?: return
+        val vw = width.toFloat()
+        val vh = height.toFloat()
+        val dw = drawable.intrinsicWidth.toFloat()
+        val dh = drawable.intrinsicHeight.toFloat()
+        if (dw <= 0 || dh <= 0) return
+        val fitScale = minOf(vw / dw, vh / dh)
+        val scaledW = dw * fitScale * scale
+        val scaledH = dh * fitScale * scale
+        val maxTx = (scaledW - vw).coerceAtLeast(0f) / 2
+        val maxTy = (scaledH - vh).coerceAtLeast(0f) / 2
+        translateX = translateX.coerceIn(-maxTx, maxTx)
+        translateY = translateY.coerceIn(-maxTy, maxTy)
+    }
+
+    private fun applyMatrix() {
+        val drawable = drawable ?: return
+        clampTranslation()
+        val vw = width.toFloat()
+        val vh = height.toFloat()
+        val dw = drawable.intrinsicWidth.toFloat()
+        val dh = drawable.intrinsicHeight.toFloat()
+        if (dw <= 0 || dh <= 0) return
+        val fitScale = minOf(vw / dw, vh / dh)
+        val baseTx = (vw - dw * fitScale) / 2
+        val baseTy = (vh - dh * fitScale) / 2
+        matrix.reset()
+        matrix.postScale(fitScale, fitScale)
+        matrix.postTranslate(baseTx, baseTy)
+        matrix.postTranslate(-vw / 2, -vh / 2)
+        matrix.postScale(scale, scale)
+        matrix.postTranslate(vw / 2 + translateX, vh / 2 + translateY)
+        imageMatrix = matrix
+    }
+
+    override fun invalidate() {
+        applyMatrix()
+        super.invalidate()
+    }
+
+    private fun viewToBitmapCoord(vx: Float, vy: Float): Pair<Int, Int>? {
+        val drawable = drawable ?: return null
+        val inv = Matrix()
+        if (!imageMatrix.invert(inv)) return null
+        val pts = floatArrayOf(vx, vy)
+        inv.mapPoints(pts)
+        val dw = drawable.intrinsicWidth
+        val dh = drawable.intrinsicHeight
+        val bx = pts[0].toInt().coerceIn(0, dw - 1)
+        val by = pts[1].toInt().coerceIn(0, dh - 1)
+        return Pair(bx, by)
+    }
+
+    private fun sendMouse(vx: Float, vy: Float) {
+        val now = SystemClock.uptimeMillis()
+        if (now - lastMouseSendTime < mouseThrottleMs) return
+        lastMouseSendTime = now
+        val coords = viewToBitmapCoord(vx, vy) ?: return
+        onControl?.invoke("m", coords.first, coords.second, 0)
+    }
+
+    private fun sendClick(vx: Float, vy: Float, button: Int) {
+        val coords = viewToBitmapCoord(vx, vy) ?: return
+        onControl?.invoke("c", coords.first, coords.second, button)
+    }
+
+    fun zoomIn() {
+        if (!enableZoom) return
+        scale = (scale + 0.25f).coerceIn(minScale, maxScale)
+        invalidate()
+    }
+
+    fun zoomOut() {
+        if (!enableZoom) return
+        scale = (scale - 0.25f).coerceIn(minScale, maxScale)
+        invalidate()
+    }
+
+    fun resetZoom() {
+        scale = 1f
+        translateX = 0f
+        translateY = 0f
+        invalidate()
+    }
+}

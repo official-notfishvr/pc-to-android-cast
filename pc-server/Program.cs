@@ -2,7 +2,9 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.Net.NetworkInformation;
+using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.Json;
 using System.Windows.Forms;
 using Fleck;
 
@@ -32,6 +34,10 @@ server.Start(socket =>
     {
         var ip = socket.ConnectionInfo.ClientIpAddress;
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] WebSocket client connected: {ip}");
+        var bounds = SystemInformation.VirtualScreen;
+        var cw = (int)(bounds.Width * scale);
+        var ch = (int)(bounds.Height * scale);
+        socket.OnMessage = msg => HandleControl(msg, bounds.Width, bounds.Height, cw, ch);
         _ = StreamFramesAsync(socket, ip);
     };
     socket.OnClose = () =>
@@ -99,6 +105,37 @@ async Task StreamFramesAsync(IWebSocketConnection socket, string clientIp)
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Stream error for {clientIp}: {ex.Message}");
     }
 }
+
+static void HandleControl(string msg, int screenW, int screenH, int captureW, int captureH)
+{
+    try
+    {
+        using var doc = JsonDocument.Parse(msg);
+        var root = doc.RootElement;
+        var t = root.TryGetProperty("t", out var tp) ? tp.GetString() : null;
+        var x = root.TryGetProperty("x", out var xp) ? xp.GetInt32() : 0;
+        var y = root.TryGetProperty("y", out var yp) ? yp.GetInt32() : 0;
+        var screenX = (int)(x * (double)screenW / captureW);
+        var screenY = (int)(y * (double)screenH / captureH);
+        screenX = Math.Clamp(screenX, 0, screenW - 1);
+        screenY = Math.Clamp(screenY, 0, screenH - 1);
+        if (t == "m") SetCursorPos(screenX, screenY);
+        else if (t == "c")
+        {
+            var b = root.TryGetProperty("b", out var bp) ? bp.GetInt32() : 0;
+            SetCursorPos(screenX, screenY);
+            mouse_event(b == 1 ? 0x0008 : 0x0002, 0, 0, 0, 0);
+            mouse_event(b == 1 ? 0x0010 : 0x0004, 0, 0, 0, 0);
+        }
+    }
+    catch { /* ignore parse errors */ }
+}
+
+[DllImport("user32.dll")]
+static extern bool SetCursorPos(int x, int y);
+
+[DllImport("user32.dll")]
+static extern void mouse_event(int dwFlags, int dx, int dy, int dwData, int dwExtraInfo);
 
 static ImageCodecInfo? GetJpegEncoder()
 {
