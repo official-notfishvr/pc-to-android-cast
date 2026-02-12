@@ -1,17 +1,17 @@
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Imaging;
-using System.Net;
 using System.Net.NetworkInformation;
 using System.Text;
 using System.Windows.Forms;
+using Fleck;
 
 var port = 9090;
-var quality = 50;  // JPEG quality 1-100
-var fps = 15;      // Frames per second
-var scale = 1.0;   // Scale factor 0.25-1.0 (smaller = less bandwidth)
+var quality = 75;
+var fps = 20;
+var scale = 1.0;
 
-// Parse args: --port 9090 --quality 50 --fps 15 --scale 0.5
+// Parse args: --port 9090 --quality 75 --fps 20 --scale 0.75
 for (int i = 0; i < args.Length - 1; i++)
 {
     if (args[i] == "--port" && int.TryParse(args[i + 1], out var p)) port = p;
@@ -22,70 +22,54 @@ for (int i = 0; i < args.Length - 1; i++)
 
 var encoder = GetJpegEncoder();
 var interval = TimeSpan.FromMilliseconds(1000.0 / fps);
-var listener = new HttpListener();
-listener.Prefixes.Add($"http://+:{port}/");
-listener.Start();
-Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Server started on port {port}");
-
 var localIps = GetAllLocalIpAddresses();
 TryAddFirewallRule(port);
+
+var server = new WebSocketServer($"ws://0.0.0.0:{port}");
+server.Start(socket =>
+{
+    socket.OnOpen = () =>
+    {
+        var ip = socket.ConnectionInfo.ClientIpAddress;
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] WebSocket client connected: {ip}");
+        _ = StreamFramesAsync(socket, ip);
+    };
+    socket.OnClose = () =>
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Client disconnected: {socket.ConnectionInfo.ClientIpAddress}");
+    };
+    socket.OnError = ex =>
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] WebSocket error: {ex.Message}");
+    };
+});
+
 Console.WriteLine();
-Console.WriteLine("  PC Screen Cast Server");
-Console.WriteLine("  =====================");
-Console.WriteLine($"  Stream URL: http://<IP>:{port}/stream");
+Console.WriteLine("  PC Screen Cast Server (WebSocket)");
+Console.WriteLine("  ==================================");
+Console.WriteLine($"  ws://<IP>:{port}");
 Console.WriteLine($"  Quality: {quality}% | FPS: {fps} | Scale: {scale:P0}");
 Console.WriteLine();
 Console.WriteLine("  Use one of these IPs (phone must be on same network):");
 foreach (var ip in localIps)
 {
     var note = ip.StartsWith("192.168.137.") ? " <- hotspot" : "";
-    Console.WriteLine($"    http://{ip}:{port}{note}");
+    Console.WriteLine($"    ws://{ip}:{port}{note}");
 }
 Console.WriteLine();
 Console.WriteLine("  On your Android phone, enter the IP and port, then Connect.");
-Console.WriteLine("  Press Ctrl+C to stop.");
+Console.WriteLine("  Press Enter to stop.");
 Console.WriteLine();
 
-_ = Task.Run(async () =>
-{
-    while (listener.IsListening)
-    {
-        try
-        {
-            var context = await listener.GetContextAsync();
-            var clientIp = context.Request.RemoteEndPoint?.Address?.ToString() ?? "?";
-            var path = context.Request.Url?.AbsolutePath ?? "/";
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Request: {path} from {clientIp}");
-            if (path == "/stream")
-            {
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Client {clientIp} connected, starting stream...");
-                context.Response.ContentType = "multipart/x-mixed-replace; boundary=frame";
-                context.Response.AddHeader("Cache-Control", "no-cache");
-                context.Response.SendChunked = true;
-                await StreamFrames(context.Response.OutputStream, clientIp);
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Client {clientIp} disconnected");
-            }
-            else
-            {
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] 404: {path}");
-                context.Response.StatusCode = 404;
-                context.Response.Close();
-            }
-        }
-        catch (HttpListenerException) { break; }
-        catch (Exception ex) { Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Error: {ex}"); }
-    }
-});
-
 Console.ReadLine();
-listener.Stop();
+server.Dispose();
 
-async Task StreamFrames(Stream output, string clientIp)
+async Task StreamFramesAsync(IWebSocketConnection socket, string clientIp)
 {
     var bounds = SystemInformation.VirtualScreen;
     var captureWidth = (int)(bounds.Width * scale);
     var captureHeight = (int)(bounds.Height * scale);
-    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Capture: {captureWidth}x{captureHeight}");
+    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Capture: {captureWidth}x{captureHeight} for {clientIp}");
     using var bitmap = new Bitmap(captureWidth, captureHeight, PixelFormat.Format24bppRgb);
     using var g = Graphics.FromImage(bitmap);
 
@@ -95,30 +79,24 @@ async Task StreamFrames(Stream output, string clientIp)
     };
 
     var frameCount = 0;
-    while (true)
+    try
     {
-        try
+        while (true)
         {
             g.CopyFromScreen(bounds.X, bounds.Y, 0, 0, new Size(bounds.Width, bounds.Height), CopyPixelOperation.SourceCopy);
-
             using var ms = new MemoryStream();
-            bitmap.Save(ms, encoder, encoderParams);
+            bitmap.Save(ms, encoder!, encoderParams);
             var bytes = ms.ToArray();
             frameCount++;
             if (frameCount == 1) Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] First frame sent: {bytes.Length} bytes");
-            else if (frameCount % 30 == 0) Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Frame {frameCount}");
-
-            var header = $"--frame\r\nContent-Type: image/jpeg\r\nContent-Length: {bytes.Length}\r\n\r\n";
-            await output.WriteAsync(Encoding.ASCII.GetBytes(header));
-            await output.WriteAsync(bytes);
-            await output.FlushAsync();
+            else if (frameCount % 60 == 0) Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Frame {frameCount}");
+            socket.Send(bytes);
+            await Task.Delay(interval);
         }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Stream error for {clientIp}: {ex.Message}");
-            break;
-        }
-        await Task.Delay(interval);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Stream error for {clientIp}: {ex.Message}");
     }
 }
 
@@ -157,7 +135,7 @@ static void TryAddFirewallRule(int port)
         RunNetsh($"advfirewall firewall delete rule name=\"{ruleName}\"");
         RunNetsh($"advfirewall firewall add rule name=\"{ruleName}\" dir=in action=allow protocol=tcp localport={port}");
     }
-    catch { /* ignore - firewall rule requires admin */ }
+    catch { /* ignore */ }
 }
 
 static void RunNetsh(string args)

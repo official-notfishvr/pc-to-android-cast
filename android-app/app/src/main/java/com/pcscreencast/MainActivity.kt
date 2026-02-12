@@ -9,6 +9,8 @@ import androidx.lifecycle.lifecycleScope
 import com.pcscreencast.databinding.ActivityMainBinding
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import android.graphics.Bitmap
+import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
 
@@ -20,6 +22,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private var streamJob: Job? = null
+    private var frameCount = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -37,31 +40,35 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, "Enter PC IP address", Toast.LENGTH_SHORT).show()
             return
         }
-        val url = "http://$ip:$port/stream"
+        val url = "ws://$ip:$port"
         Log.d(TAG, "Connecting to $url")
         streamJob?.cancel()
+        frameCount = 0
         showConnecting(true, getString(R.string.connecting))
         streamJob = lifecycleScope.launch(Dispatchers.IO) {
             try {
-                MjpegInputStream(java.net.URL(url)).stream()
-                    .catch { e ->
+                WebSocketStream(url).stream()
+                    .buffer(16)
+                    .catch { e: Throwable ->
                         Log.e(TAG, "Stream error: ${e.javaClass.simpleName} - ${e.message}", e)
                         runOnUiThread {
                             Toast.makeText(this@MainActivity, "Error: ${e.message}", Toast.LENGTH_LONG).show()
                             showStreaming(false)
                         }
                     }
-                    .collect { bitmap ->
+                    .collect { bitmap: Bitmap? ->
                         runOnUiThread {
                             if (bitmap != null) {
-                                Log.d(TAG, "Frame received, streaming")
+                                if (frameCount++ == 0) Log.d(TAG, "First frame, streaming")
                                 showStreaming(true)
                                 (binding.imageStream.drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap?.let { old ->
                                     if (old != bitmap && !old.isRecycled) old.recycle()
                                 }
                                 binding.imageStream.setImageBitmap(bitmap)
+                                binding.imageStream.invalidate()
                             } else {
                                 Log.w(TAG, "Stream ended or error (bitmap=null)")
+                                showStreaming(false)
                             }
                         }
                     }
