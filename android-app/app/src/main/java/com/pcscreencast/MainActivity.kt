@@ -1,11 +1,15 @@
 package com.pcscreencast
 
 import android.content.SharedPreferences
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.view.View
+import android.view.WindowManager
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import android.text.Editable
+import android.text.TextWatcher
 import androidx.lifecycle.lifecycleScope
 import com.pcscreencast.databinding.ActivityMainBinding
 import kotlinx.coroutines.CancellationException
@@ -35,10 +39,14 @@ class MainActivity : AppCompatActivity() {
     private var fullCaptureHeight = 0
     private var currentCropRegion: IntArray? = null
     private var lastSentViewport: IntArray? = null
+    private var keyboardLastLength = 0
+    private var ctrlHeld = false
+    private var altHeld = false
+    private var winHeld = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        prefs = getSharedPreferences(StreamPreferences.PREFS_NAME, MODE_PRIVATE)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
@@ -46,9 +54,8 @@ class MainActivity : AppCompatActivity() {
         binding.editPort.setText(prefs.getString(KEY_PORT, "9090") ?: "9090")
 
         binding.btnConnect.setOnClickListener { connect() }
-        binding.btnToggleControls.setOnClickListener {
-            val panel = binding.controlsPanel
-            panel.visibility = if (panel.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+        binding.btnStreamSettings.setOnClickListener {
+            startActivity(android.content.Intent(this, SettingsActivity::class.java))
         }
 
         val streamView = binding.imageStream as? ZoomableStreamView ?: return
@@ -57,7 +64,79 @@ class MainActivity : AppCompatActivity() {
         binding.switchTapRight.setOnCheckedChangeListener { _, checked -> streamView.tapIsRightClick = checked }
         binding.btnResetZoom.setOnClickListener { streamView.resetZoom() }
         streamView.onDoubleTapView = {
-            binding.btnToggleControls.visibility = if (binding.btnToggleControls.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+            val panel = binding.controlsPanel
+            val overlay = binding.controlsDismissOverlay
+            if (panel.visibility == View.VISIBLE) {
+                panel.visibility = View.GONE
+                overlay.visibility = View.GONE
+            } else {
+                panel.visibility = View.VISIBLE
+                overlay.visibility = View.VISIBLE
+            }
+        }
+        binding.controlsDismissOverlay.setOnClickListener {
+            binding.controlsPanel.visibility = View.GONE
+            binding.controlsDismissOverlay.visibility = View.GONE
+        }
+
+        binding.streamOptionsBar.setOnClickListener {
+            binding.controlsPanel.visibility = View.VISIBLE
+            binding.controlsDismissOverlay.visibility = View.VISIBLE
+        }
+
+        binding.btnKeyboard.setOnClickListener {
+            binding.keyboardOverlay.visibility = View.VISIBLE
+            binding.keyboardInput.requestFocus()
+            keyboardLastLength = 0
+            binding.keyboardInput.text?.clear()
+        }
+        binding.keyBtnClose.setOnClickListener {
+            binding.keyboardOverlay.visibility = View.GONE
+            binding.keyboardInput.clearFocus()
+        }
+
+        binding.keyboardInput.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                val str = s?.toString() ?: ""
+                val len = str.length
+                val stream = webSocketStream ?: return
+                when {
+                    len > keyboardLastLength -> {
+                        stream.sendUnicodeText(str.substring(keyboardLastLength))
+                    }
+                    len < keyboardLastLength -> {
+                        repeat(keyboardLastLength - len) { stream.sendKey(PcKeyCodes.VK_BACK, 1) }
+                    }
+                }
+                keyboardLastLength = len
+            }
+        })
+
+        fun sendKey(vk: Int) {
+            webSocketStream?.sendKey(vk, 1, ctrlHeld, altHeld, winHeld)
+        }
+        binding.keyBtnBackspace.setOnClickListener { sendKey(PcKeyCodes.VK_BACK) }
+        binding.keyBtnEnter.setOnClickListener { sendKey(PcKeyCodes.VK_RETURN) }
+        binding.keyBtnTab.setOnClickListener { sendKey(PcKeyCodes.VK_TAB) }
+        binding.keyBtnEsc.setOnClickListener { sendKey(PcKeyCodes.VK_ESCAPE) }
+        binding.keyBtnUp.setOnClickListener { sendKey(PcKeyCodes.VK_UP) }
+        binding.keyBtnDown.setOnClickListener { sendKey(PcKeyCodes.VK_DOWN) }
+        binding.keyBtnLeft.setOnClickListener { sendKey(PcKeyCodes.VK_LEFT) }
+        binding.keyBtnRight.setOnClickListener { sendKey(PcKeyCodes.VK_RIGHT) }
+
+        binding.keyBtnCtrl.setOnClickListener {
+            ctrlHeld = !ctrlHeld
+            webSocketStream?.sendKey(PcKeyCodes.VK_CONTROL, if (ctrlHeld) 1 else 0)
+        }
+        binding.keyBtnAlt.setOnClickListener {
+            altHeld = !altHeld
+            webSocketStream?.sendKey(PcKeyCodes.VK_MENU, if (altHeld) 1 else 0)
+        }
+        binding.keyBtnWin.setOnClickListener {
+            winHeld = !winHeld
+            webSocketStream?.sendKey(PcKeyCodes.VK_LWIN, if (winHeld) 1 else 0)
         }
     }
 
@@ -108,8 +187,11 @@ class MainActivity : AppCompatActivity() {
                                     currentCropRegion = intArrayOf(0, 0, bitmap.width, bitmap.height)
                                     lastSentViewport = intArrayOf(0, 0, bitmap.width, bitmap.height)
                                     stream.sendViewport(0, 0, bitmap.width, bitmap.height)
-                                    (binding.imageStream as? ZoomableStreamView)?.onControl = { type, x, y, button ->
-                                        stream.sendControl(type, x, y, button)
+                                    (binding.imageStream as? ZoomableStreamView)?.apply {
+                                        onControl = { type, x, y, button ->
+                                            stream.sendControl(type, x, y, button)
+                                        }
+                                        onScroll = { dx, dy -> stream.sendScroll(dx, dy) }
                                     }
                                 } else {
                                     currentCropRegion = lastSentViewport?.copyOf()
@@ -189,7 +271,43 @@ class MainActivity : AppCompatActivity() {
         val wasStreaming = binding.streamContainer.visibility == View.VISIBLE
         binding.connectPanel.visibility = if (show) View.GONE else View.VISIBLE
         binding.streamContainer.visibility = if (show) View.VISIBLE else View.GONE
-        if (show && !wasStreaming) binding.controlsPanel.visibility = View.GONE
+        if (show && !wasStreaming) {
+            binding.controlsPanel.visibility = View.GONE
+            binding.controlsDismissOverlay.visibility = View.GONE
+            binding.keyboardOverlay.visibility = View.GONE
+        }
+        if (!show) binding.keyboardOverlay.visibility = View.GONE
+        setStreamingUi(show)
+    }
+
+    private fun setStreamingUi(streaming: Boolean) {
+        if (streaming) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                window.insetsController?.let { controller ->
+                    controller.hide(android.view.WindowInsets.Type.statusBars() or android.view.WindowInsets.Type.navigationBars())
+                    controller.systemBarsBehavior = android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                }
+            } else {
+                @Suppress("DEPRECATION")
+                window.decorView.systemUiVisibility = (
+                    View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                    or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                    or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                    or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                    or View.SYSTEM_UI_FLAG_FULLSCREEN
+                    or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                )
+            }
+        } else {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                window.insetsController?.show(android.view.WindowInsets.Type.statusBars() or android.view.WindowInsets.Type.navigationBars())
+            } else {
+                @Suppress("DEPRECATION")
+                window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_VISIBLE
+            }
+        }
     }
 
     override fun onDestroy() {

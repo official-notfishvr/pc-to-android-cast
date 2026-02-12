@@ -27,6 +27,10 @@ class ZoomableStreamView @JvmOverloads constructor(
     private var lastTouchY = 0f
     private var lastMouseSendTime = 0L
     private val mouseThrottleMs = 30L
+    private var lastScrollX = 0f
+    private var lastScrollY = 0f
+    private var lastScrollSendTime = 0L
+    private val scrollThrottleMs = 25L
     private var minScale = 0.5f
     private var maxScale = 4f
 
@@ -57,6 +61,8 @@ class ZoomableStreamView @JvmOverloads constructor(
 
     var onControl: ((type: String, x: Int, y: Int, button: Int) -> Unit)? = null
     var onDoubleTapView: (() -> Unit)? = null
+    /** Called with scroll deltas (dx, dy) when user scrolls with two fingers. */
+    var onScroll: ((deltaX: Int, deltaY: Int) -> Unit)? = null
     val scale: Float get() = _scale
     var enableZoom = true
     var enableClicks = true
@@ -71,9 +77,34 @@ class ZoomableStreamView @JvmOverloads constructor(
                 MotionEvent.ACTION_DOWN -> {
                     lastTouchX = event.x
                     lastTouchY = event.y
+                    if (event.pointerCount >= 2) {
+                        lastScrollX = (event.getX(0) + event.getX(1)) / 2f
+                        lastScrollY = (event.getY(0) + event.getY(1)) / 2f
+                    }
+                }
+                MotionEvent.ACTION_POINTER_DOWN -> {
+                    if (event.pointerCount == 2) {
+                        lastScrollX = (event.getX(0) + event.getX(1)) / 2f
+                        lastScrollY = (event.getY(0) + event.getY(1)) / 2f
+                    }
                 }
                 MotionEvent.ACTION_MOVE -> {
-                    if (event.pointerCount == 1 && !scaleDetector.isInProgress) {
+                    if (event.pointerCount == 2 && !scaleDetector.isInProgress) {
+                        val cx = (event.getX(0) + event.getX(1)) / 2f
+                        val cy = (event.getY(0) + event.getY(1)) / 2f
+                        val dx = cx - lastScrollX
+                        val dy = cy - lastScrollY
+                        lastScrollX = cx
+                        lastScrollY = cy
+                        val now = SystemClock.uptimeMillis()
+                        if (now - lastScrollSendTime >= scrollThrottleMs && (dx != 0f || dy != 0f)) {
+                            lastScrollSendTime = now
+                            val roundDx = dx.toInt().coerceIn(-20, 20)
+                            val roundDy = dy.toInt().coerceIn(-20, 20)
+                            if (roundDx != 0 || roundDy != 0)
+                                onScroll?.invoke(-roundDx, -roundDy)
+                        }
+                    } else if (event.pointerCount == 1 && !scaleDetector.isInProgress) {
                         val dx = event.x - lastTouchX
                         val dy = event.y - lastTouchY
                         lastTouchX = event.x

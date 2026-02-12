@@ -4,16 +4,17 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#000000">
+    android:background="@color/background_dark">
 
     <LinearLayout
         android:id="@+id/connectPanel"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="24dp"
+        android:padding="28dp"
+        android:minWidth="320dp"
         android:background="@drawable/connect_panel_background"
-        android:elevation="8dp"
+        android:elevation="12dp"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
@@ -24,19 +25,20 @@
             android:layout_height="wrap_content"
             android:text="@string/app_name"
             android:textColor="@color/connect_title"
-            android:textSize="22sp"
+            android:textSize="26sp"
+            android:letterSpacing="0.02"
             android:textStyle="bold"
             android:layout_gravity="center_horizontal"
-            android:layout_marginBottom="4dp" />
+            android:layout_marginBottom="6dp" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/connect_subtitle"
             android:textColor="@color/connect_hint"
-            android:textSize="13sp"
+            android:textSize="14sp"
             android:layout_gravity="center_horizontal"
-            android:layout_marginBottom="12dp" />
+            android:layout_marginBottom="20dp" />
 
         <TextView
             android:id="@+id/tipHotspot"
@@ -46,7 +48,7 @@
             android:textColor="@color/connect_hint"
             android:textSize="12sp"
             android:layout_gravity="center_horizontal"
-            android:layout_marginBottom="16dp" />
+            android:layout_marginBottom="20dp" />
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -57,39 +59,65 @@
             <EditText
                 android:id="@+id/editIp"
                 android:layout_width="0dp"
-                android:layout_height="48dp"
+                android:layout_height="52dp"
                 android:layout_weight="1"
-                android:layout_marginEnd="8dp"
+                android:layout_marginEnd="10dp"
                 android:hint="@string/hint_ip"
                 android:inputType="text"
                 android:maxLines="1"
                 android:minWidth="140dp"
-                android:padding="12dp"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:paddingTop="14dp"
+                android:paddingBottom="14dp"
                 android:textColor="@color/connect_text"
                 android:textColorHint="@color/connect_hint"
+                android:textSize="15sp"
                 android:background="@drawable/edit_background" />
 
             <EditText
                 android:id="@+id/editPort"
-                android:layout_width="72dp"
-                android:layout_height="48dp"
-                android:layout_marginEnd="8dp"
+                android:layout_width="76dp"
+                android:layout_height="52dp"
+                android:layout_marginEnd="10dp"
                 android:hint="@string/hint_port"
                 android:inputType="number"
                 android:maxLines="1"
-                android:padding="12dp"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:paddingTop="14dp"
+                android:paddingBottom="14dp"
                 android:text="9090"
                 android:textColor="@color/connect_text"
                 android:textColorHint="@color/connect_hint"
+                android:textSize="15sp"
                 android:background="@drawable/edit_background" />
 
-            <Button
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnConnect"
                 android:layout_width="wrap_content"
-                android:layout_height="48dp"
+                android:layout_height="52dp"
+                android:minWidth="120dp"
                 android:text="@string/connect"
-                android:paddingHorizontal="20dp" />
+                android:textColor="#FFFFFF"
+                android:textSize="15sp"
+                android:textAllCaps="false"
+                app:backgroundTint="@color/accent"
+                app:cornerRadius="12dp"
+                android:paddingHorizontal="24dp" />
         </LinearLayout>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnStreamSettings"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:text="@string/stream_settings"
+            android:textColor="@color/connect_hint"
+            android:textSize="14sp"
+            android:textAllCaps="false"
+            app:backgroundTint="@android:color/transparent" />
     </LinearLayout>
 
     <FrameLayout
@@ -97,7 +125,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:visibility="gone"
-        android:background="#000000"
+        android:background="@color/background_dark"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
@@ -109,55 +137,75 @@
             android:layout_height="match_parent"
             android:contentDescription="Screen stream" />
 
-        <androidx.appcompat.widget.AppCompatImageButton
-            android:id="@+id/btnToggleControls"
-            android:layout_width="36dp"
+        <TextView
+            android:id="@+id/streamOptionsBar"
+            android:layout_width="match_parent"
             android:layout_height="36dp"
-            android:layout_gravity="bottom|end"
-            android:layout_margin="16dp"
-            android:background="@drawable/btn_float_circle"
-            android:contentDescription="@string/toggle_controls"
-            android:padding="8dp"
-            android:scaleType="centerInside"
-            android:src="@android:drawable/ic_menu_preferences"
-            app:tint="#E0FFFFFF" />
+            android:layout_gravity="top"
+            android:background="#40000000"
+            android:gravity="center"
+            android:text="@string/tap_for_options"
+            android:textColor="@color/panel_text"
+            android:textSize="13sp"
+            android:clickable="true"
+            android:focusable="true"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp" />
+
+        <View
+            android:id="@+id/controlsDismissOverlay"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone"
+            android:clickable="true"
+            android:focusable="true" />
 
         <LinearLayout
             android:id="@+id/controlsPanel"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="end|center_vertical"
-            android:layout_margin="8dp"
+            android:layout_margin="16dp"
             android:orientation="vertical"
-            android:padding="14dp"
+            android:padding="18dp"
             android:background="@drawable/panel_background"
-            android:elevation="6dp"
+            android:elevation="8dp"
             android:visibility="gone"
-            android:minWidth="140dp">
+            android:minWidth="160dp">
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Controls"
-                android:textColor="#E0FFFFFF"
-                android:textSize="14sp"
+                android:text="@string/options"
+                android:textColor="@color/panel_title"
+                android:textSize="15sp"
                 android:textStyle="bold"
                 android:layout_gravity="center_horizontal"
-                android:layout_marginBottom="8dp" />
+                android:layout_marginBottom="14dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/double_tap_hint"
+                android:textColor="@color/connect_hint"
+                android:textSize="11sp"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginBottom="12dp" />
 
             <LinearLayout
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
                 android:minWidth="120dp">
 
                 <TextView
-                    android:layout_width="60dp"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
+                    android:layout_weight="1"
                     android:text="@string/zoom"
-                    android:textColor="#E0FFFFFF"
-                    android:textSize="13sp" />
+                    android:textColor="@color/panel_text"
+                    android:textSize="14sp" />
 
                 <androidx.appcompat.widget.SwitchCompat
                     android:id="@+id/switchZoom"
@@ -167,19 +215,20 @@
             </LinearLayout>
 
             <LinearLayout
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
-                android:layout_marginTop="6dp"
+                android:layout_marginTop="10dp"
                 android:minWidth="120dp">
 
                 <TextView
-                    android:layout_width="60dp"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
+                    android:layout_weight="1"
                     android:text="@string/clicks"
-                    android:textColor="#E0FFFFFF"
-                    android:textSize="13sp" />
+                    android:textColor="@color/panel_text"
+                    android:textSize="14sp" />
 
                 <androidx.appcompat.widget.SwitchCompat
                     android:id="@+id/switchClicks"
@@ -189,19 +238,20 @@
             </LinearLayout>
 
             <LinearLayout
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
-                android:layout_marginTop="6dp"
+                android:layout_marginTop="10dp"
                 android:minWidth="120dp">
 
                 <TextView
-                    android:layout_width="60dp"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
+                    android:layout_weight="1"
                     android:text="@string/tap_right"
-                    android:textColor="#E0FFFFFF"
-                    android:textSize="13sp" />
+                    android:textColor="@color/panel_text"
+                    android:textSize="14sp" />
 
                 <androidx.appcompat.widget.SwitchCompat
                     android:id="@+id/switchTapRight"
@@ -210,13 +260,252 @@
                     android:checked="false" />
             </LinearLayout>
 
-            <Button
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnResetZoom"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                 android:layout_width="match_parent"
-                android:layout_height="36dp"
-                android:layout_marginTop="12dp"
+                android:layout_height="40dp"
+                android:layout_marginTop="14dp"
                 android:text="@string/reset_zoom"
-                android:textSize="13sp" />
+                android:textColor="@color/connect_title"
+                android:textSize="13sp"
+                android:textAllCaps="false"
+                app:strokeColor="#40475569"
+                app:strokeWidth="1dp"
+                app:backgroundTint="@color/surface_elevated"
+                app:cornerRadius="10dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnKeyboard"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                android:layout_marginTop="8dp"
+                android:text="@string/keyboard"
+                android:textColor="@color/connect_title"
+                android:textSize="13sp"
+                android:textAllCaps="false"
+                app:strokeColor="#40475569"
+                app:strokeWidth="1dp"
+                app:backgroundTint="@color/surface_elevated"
+                app:cornerRadius="10dp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/keyboardOverlay"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom"
+            android:orientation="vertical"
+            android:visibility="gone"
+            android:background="@drawable/panel_background"
+            android:padding="12dp"
+            android:elevation="8dp">
+
+            <EditText
+                android:id="@+id/keyboardInput"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:layout_marginBottom="10dp"
+                android:hint="@string/keyboard_hint"
+                android:inputType="text|textMultiLine"
+                android:imeOptions="actionDone"
+                android:maxLines="3"
+                android:padding="10dp"
+                android:textColor="@color/connect_title"
+                android:textColorHint="@color/connect_hint"
+                android:textSize="14sp"
+                android:background="@drawable/edit_background" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center"
+                android:layout_marginBottom="6dp">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/keyBtnBackspace"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="36dp"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="4dp"
+                    android:text="⌫"
+                    android:textColor="@color/panel_text"
+                    android:textSize="16sp"
+                    app:cornerRadius="8dp"
+                    app:strokeColor="#40475569"
+                    app:strokeWidth="1dp"
+                    app:backgroundTint="@color/surface_elevated" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/keyBtnEnter"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="36dp"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="4dp"
+                    android:text="↵"
+                    android:textColor="@color/panel_text"
+                    android:textSize="16sp"
+                    app:cornerRadius="8dp"
+                    app:strokeColor="#40475569"
+                    app:strokeWidth="1dp"
+                    app:backgroundTint="@color/surface_elevated" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/keyBtnTab"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="36dp"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="4dp"
+                    android:text="Tab"
+                    android:textColor="@color/panel_text"
+                    android:textSize="12sp"
+                    app:cornerRadius="8dp"
+                    app:strokeColor="#40475569"
+                    app:strokeWidth="1dp"
+                    app:backgroundTint="@color/surface_elevated" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/keyBtnEsc"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="36dp"
+                    android:layout_weight="1"
+                    android:text="Esc"
+                    android:textColor="@color/panel_text"
+                    android:textSize="12sp"
+                    app:cornerRadius="8dp"
+                    app:strokeColor="#40475569"
+                    app:strokeWidth="1dp"
+                    app:backgroundTint="@color/surface_elevated" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/keyBtnCtrl"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="34dp"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="3dp"
+                    android:text="Ctrl"
+                    android:textColor="@color/panel_text"
+                    android:textSize="11sp"
+                    app:cornerRadius="6dp"
+                    app:strokeColor="#40475569"
+                    app:strokeWidth="1dp"
+                    app:backgroundTint="@color/surface_elevated" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/keyBtnAlt"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="34dp"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="3dp"
+                    android:text="Alt"
+                    android:textColor="@color/panel_text"
+                    android:textSize="11sp"
+                    app:cornerRadius="6dp"
+                    app:strokeColor="#40475569"
+                    app:strokeWidth="1dp"
+                    app:backgroundTint="@color/surface_elevated" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/keyBtnWin"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="34dp"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="3dp"
+                    android:text="Win"
+                    android:textColor="@color/panel_text"
+                    android:textSize="11sp"
+                    app:cornerRadius="6dp"
+                    app:strokeColor="#40475569"
+                    app:strokeWidth="1dp"
+                    app:backgroundTint="@color/surface_elevated" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/keyBtnUp"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="34dp"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="3dp"
+                    android:text="↑"
+                    android:textColor="@color/panel_text"
+                    android:textSize="14sp"
+                    app:cornerRadius="6dp"
+                    app:strokeColor="#40475569"
+                    app:strokeWidth="1dp"
+                    app:backgroundTint="@color/surface_elevated" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/keyBtnDown"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="34dp"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="3dp"
+                    android:text="↓"
+                    android:textColor="@color/panel_text"
+                    android:textSize="14sp"
+                    app:cornerRadius="6dp"
+                    app:strokeColor="#40475569"
+                    app:strokeWidth="1dp"
+                    app:backgroundTint="@color/surface_elevated" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/keyBtnLeft"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="34dp"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="3dp"
+                    android:text="←"
+                    android:textColor="@color/panel_text"
+                    android:textSize="14sp"
+                    app:cornerRadius="6dp"
+                    app:strokeColor="#40475569"
+                    app:strokeWidth="1dp"
+                    app:backgroundTint="@color/surface_elevated" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/keyBtnRight"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="34dp"
+                    android:layout_weight="1"
+                    android:text="→"
+                    android:textColor="@color/panel_text"
+                    android:textSize="14sp"
+                    app:cornerRadius="6dp"
+                    app:strokeColor="#40475569"
+                    app:strokeWidth="1dp"
+                    app:backgroundTint="@color/surface_elevated" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/keyBtnClose"
+                    style="@style/Widget.MaterialComponents.Button"
+                    android:layout_width="0dp"
+                    android:layout_height="34dp"
+                    android:layout_weight="0.8"
+                    android:text="@string/close"
+                    android:textColor="#FFFFFF"
+                    android:textSize="11sp"
+                    app:backgroundTint="@color/accent"
+                    app:cornerRadius="6dp" />
+            </LinearLayout>
         </LinearLayout>
     </FrameLayout>
 
@@ -237,7 +526,7 @@
             android:id="@+id/progressBar"
             android:layout_width="48dp"
             android:layout_height="48dp"
-            android:indeterminateTint="#FFFFFF" />
+            android:indeterminateTint="@color/accent" />
 
         <TextView
             android:id="@+id/loadingText"
@@ -245,7 +534,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
             android:text="@string/loading"
-            android:textColor="#FFFFFF"
+            android:textColor="@color/connect_title"
             android:textSize="16sp" />
     </LinearLayout>
 

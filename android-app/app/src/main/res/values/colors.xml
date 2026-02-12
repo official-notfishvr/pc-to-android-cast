@@ -1,8 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#6200EE</color>
-    <color name="connect_title">#FFFFFF</color>
-    <color name="connect_text">#FFFFFF</color>
-    <color name="connect_hint">#B0B0B0</color>
-    <color name="stream_status_text">#E0FFFFFF</color>
+    <color name="ic_launcher_background">#0D9488</color>
+    <color name="connect_title">#F1F5F9</color>
+    <color name="connect_text">#E2E8F0</color>
+    <color name="connect_hint">#94A3B8</color>
+    <color name="stream_status_text">#E2E8F0</color>
+    <color name="panel_title">#F1F5F9</color>
+    <color name="panel_text">#CBD5E1</color>
+    <color name="accent">#14B8A6</color>
+    <color name="accent_variant">#0D9488</color>
+    <color name="surface">#1E293B</color>
+    <color name="surface_elevated">#334155</color>
+    <color name="background_dark">#0F172A</color>
 </resources>

@@ -14,7 +14,22 @@
     <string name="clicks">Clicks</string>
     <string name="tap_right">Tap=Right</string>
     <string name="reset_zoom">Reset zoom</string>
+    <string name="options">Options</string>
+    <string name="double_tap_hint">Tap outside to close</string>
     <string name="toggle_controls">Settings</string>
+    <string name="keyboard">Keyboard</string>
+    <string name="keyboard_hint">Type here — sends to PC</string>
+    <string name="close">Close</string>
+    <string name="stream_settings">Stream settings (scale, quality, FPS)</string>
+    <string name="tap_for_options">Tap for options · or double-tap stream</string>
+    <string name="settings_title">Stream settings</string>
+    <string name="scale_label">Scale</string>
+    <string name="quality_label">Quality (full view)</string>
+    <string name="fps_label">FPS (full view)</string>
+    <string name="when_zoomed">When zoomed in</string>
+    <string name="quality_zoomed_label">Quality</string>
+    <string name="fps_zoomed_label">FPS</string>
+    <string name="use_same">Same as above</string>
     <string name="error_timeout">Connection timed out. Start the PC server and use the correct IP (e.g. 192.168.137.1 for hotspot).</string>
     <string name="error_generic">Connection failed: %1$s</string>
 </resources>
