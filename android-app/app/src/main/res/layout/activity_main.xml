@@ -10,8 +10,8 @@
         android:id="@+id/connectPanel"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:padding="20dp"
+        android:orientation="vertical"
+        android:padding="24dp"
         android:background="@drawable/connect_panel_background"
         android:elevation="8dp"
         app:layout_constraintTop_toTopOf="parent"
@@ -19,39 +19,77 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintBottom_toBottomOf="parent">
 
-        <EditText
-            android:id="@+id/editIp"
-            android:layout_width="0dp"
-            android:layout_height="48dp"
-            android:layout_weight="1"
-            android:layout_marginEnd="8dp"
-            android:hint="@string/hint_ip"
-            android:inputType="text"
-            android:maxLines="1"
-            android:minWidth="120dp"
-            android:padding="12dp"
-            android:textColor="#FFFFFF"
-            android:textColorHint="#888888" />
-
-        <EditText
-            android:id="@+id/editPort"
-            android:layout_width="80dp"
-            android:layout_height="48dp"
-            android:layout_marginEnd="8dp"
-            android:hint="@string/hint_port"
-            android:inputType="number"
-            android:maxLines="1"
-            android:padding="12dp"
-            android:text="9090"
-            android:textColor="#FFFFFF"
-            android:textColorHint="#888888" />
-
-        <Button
-            android:id="@+id/btnConnect"
+        <TextView
             android:layout_width="wrap_content"
-            android:layout_height="48dp"
-            android:text="@string/connect"
-            android:paddingHorizontal="24dp" />
+            android:layout_height="wrap_content"
+            android:text="@string/app_name"
+            android:textColor="@color/connect_title"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginBottom="4dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/connect_subtitle"
+            android:textColor="@color/connect_hint"
+            android:textSize="13sp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginBottom="12dp" />
+
+        <TextView
+            android:id="@+id/tipHotspot"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/tip_hotspot"
+            android:textColor="@color/connect_hint"
+            android:textSize="12sp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginBottom="16dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <EditText
+                android:id="@+id/editIp"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:layout_marginEnd="8dp"
+                android:hint="@string/hint_ip"
+                android:inputType="text"
+                android:maxLines="1"
+                android:minWidth="140dp"
+                android:padding="12dp"
+                android:textColor="@color/connect_text"
+                android:textColorHint="@color/connect_hint"
+                android:background="@drawable/edit_background" />
+
+            <EditText
+                android:id="@+id/editPort"
+                android:layout_width="72dp"
+                android:layout_height="48dp"
+                android:layout_marginEnd="8dp"
+                android:hint="@string/hint_port"
+                android:inputType="number"
+                android:maxLines="1"
+                android:padding="12dp"
+                android:text="9090"
+                android:textColor="@color/connect_text"
+                android:textColorHint="@color/connect_hint"
+                android:background="@drawable/edit_background" />
+
+            <Button
+                android:id="@+id/btnConnect"
+                android:layout_width="wrap_content"
+                android:layout_height="48dp"
+                android:text="@string/connect"
+                android:paddingHorizontal="20dp" />
+        </LinearLayout>
     </LinearLayout>
 
     <FrameLayout
@@ -73,13 +111,14 @@
 
         <androidx.appcompat.widget.AppCompatImageButton
             android:id="@+id/btnToggleControls"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:layout_gravity="top|end"
-            android:layout_margin="12dp"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_gravity="bottom|end"
+            android:layout_margin="16dp"
+            android:background="@drawable/btn_float_circle"
+            android:contentDescription="@string/toggle_controls"
             android:padding="8dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="Toggle controls"
+            android:scaleType="centerInside"
             android:src="@android:drawable/ic_menu_preferences"
             app:tint="#E0FFFFFF" />
 
@@ -88,12 +127,13 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="end|center_vertical"
-            android:layout_margin="12dp"
+            android:layout_margin="8dp"
             android:orientation="vertical"
-            android:padding="12dp"
+            android:padding="14dp"
             android:background="@drawable/panel_background"
-            android:elevation="4dp"
-            android:visibility="gone">
+            android:elevation="6dp"
+            android:visibility="gone"
+            android:minWidth="140dp">
 
             <TextView
                 android:layout_width="wrap_content"
@@ -170,6 +210,13 @@
                     android:checked="false" />
             </LinearLayout>
 
+            <Button
+                android:id="@+id/btnResetZoom"
+                android:layout_width="match_parent"
+                android:layout_height="36dp"
+                android:layout_marginTop="12dp"
+                android:text="@string/reset_zoom"
+                android:textSize="13sp" />
         </LinearLayout>
     </FrameLayout>
 

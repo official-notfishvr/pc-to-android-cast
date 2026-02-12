@@ -45,12 +45,18 @@ class ZoomableStreamView @JvmOverloads constructor(
             return true
         }
 
+        override fun onDoubleTap(e: MotionEvent): Boolean {
+            onDoubleTapView?.invoke()
+            return true
+        }
+
         override fun onLongPress(e: MotionEvent) {
             sendClick(e.x, e.y, if (tapIsRightClick) 0 else 1)
         }
     })
 
     var onControl: ((type: String, x: Int, y: Int, button: Int) -> Unit)? = null
+    var onDoubleTapView: (() -> Unit)? = null
     val scale: Float get() = _scale
     var enableZoom = true
     var enableClicks = true

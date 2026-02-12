@@ -8,12 +8,14 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.pcscreencast.databinding.ActivityMainBinding
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import android.graphics.Bitmap
 import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
+import java.net.SocketTimeoutException
 
 class MainActivity : AppCompatActivity() {
 
@@ -53,6 +55,10 @@ class MainActivity : AppCompatActivity() {
         binding.switchZoom.setOnCheckedChangeListener { _, checked -> streamView.enableZoom = checked }
         binding.switchClicks.setOnCheckedChangeListener { _, checked -> streamView.enableClicks = checked }
         binding.switchTapRight.setOnCheckedChangeListener { _, checked -> streamView.tapIsRightClick = checked }
+        binding.btnResetZoom.setOnClickListener { streamView.resetZoom() }
+        streamView.onDoubleTapView = {
+            binding.btnToggleControls.visibility = if (binding.btnToggleControls.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+        }
     }
 
     private fun connect() {
@@ -79,15 +85,21 @@ class MainActivity : AppCompatActivity() {
                 stream.stream()
                     .buffer(16)
                     .catch { e: Throwable ->
+                        if (e is CancellationException) throw e
                         Log.e(TAG, "Stream error: ${e.javaClass.simpleName} - ${e.message}", e)
                         runOnUiThread {
-                            Toast.makeText(this@MainActivity, "Error: ${e.message}", Toast.LENGTH_LONG).show()
+                            val msg = when (e) {
+                                is SocketTimeoutException -> getString(R.string.error_timeout)
+                                else -> getString(R.string.error_generic, e.message ?: e.javaClass.simpleName)
+                            }
+                            Toast.makeText(this@MainActivity, msg, Toast.LENGTH_LONG).show()
                             showStreaming(false)
                         }
                     }
-                    .collect { bitmap: Bitmap? ->
-                        runOnUiThread {
-                            if (bitmap != null) {
+                    .collect { event ->
+                        when (event) {
+                            is StreamEvent.Frame -> runOnUiThread {
+                                val bitmap = event.bitmap
                                 val isFirst = frameCount++ == 0
                                 if (isFirst) {
                                     Log.d(TAG, "First frame, streaming")
@@ -129,16 +141,30 @@ class MainActivity : AppCompatActivity() {
                                         stream.sendViewport(viewportToSend[0], viewportToSend[1], viewportToSend[2], viewportToSend[3])
                                     }
                                 }
-                            } else {
-                                Log.w(TAG, "Stream ended or error (bitmap=null)")
+                            }
+                            is StreamEvent.Error -> runOnUiThread {
+                                Log.w(TAG, "Stream error: ${event.throwable.message}")
+                                val msg = when (event.throwable) {
+                                    is SocketTimeoutException -> getString(R.string.error_timeout)
+                                    else -> getString(R.string.error_generic, event.throwable.message ?: event.throwable.javaClass.simpleName)
+                                }
+                                Toast.makeText(this@MainActivity, msg, Toast.LENGTH_LONG).show()
+                                showStreaming(false)
+                            }
+                            is StreamEvent.Closed -> runOnUiThread {
                                 showStreaming(false)
                             }
                         }
                     }
             } catch (e: Exception) {
+                if (e is CancellationException) return@launch
                 Log.e(TAG, "Connect failed: ${e.javaClass.simpleName} - ${e.message}", e)
                 runOnUiThread {
-                    Toast.makeText(this@MainActivity, "Failed: ${e.message}", Toast.LENGTH_LONG).show()
+                    val msg = when (e) {
+                        is SocketTimeoutException -> getString(R.string.error_timeout)
+                        else -> getString(R.string.error_generic, e.message ?: e.javaClass.simpleName)
+                    }
+                    Toast.makeText(this@MainActivity, msg, Toast.LENGTH_LONG).show()
                     showStreaming(false)
                 }
             }
@@ -150,7 +176,6 @@ class MainActivity : AppCompatActivity() {
         streamJob = null
         webSocketStream = null
         showStreaming(false)
-        Toast.makeText(this, "Disconnected", Toast.LENGTH_SHORT).show()
     }
 
     private fun showConnecting(show: Boolean, message: String = getString(R.string.loading)) {

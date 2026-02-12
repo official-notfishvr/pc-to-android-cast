@@ -26,12 +26,13 @@ class WebSocketStream(private val url: String) {
 
     private val webSocketRef = AtomicReference<WebSocket?>(null)
 
-    fun stream(): Flow<Bitmap?> = callbackFlow {
+    fun stream(): Flow<StreamEvent> = callbackFlow {
         Log.d(TAG, "Connecting to $url")
         val client = OkHttpClient.Builder()
-            .connectTimeout(10, TimeUnit.SECONDS)
+            .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(0, TimeUnit.SECONDS)
-            .writeTimeout(10, TimeUnit.SECONDS)
+            .writeTimeout(15, TimeUnit.SECONDS)
+            .retryOnConnectionFailure(true)
             .build()
         val request = Request.Builder().url(url).build()
 
@@ -43,16 +44,16 @@ class WebSocketStream(private val url: String) {
 
             override fun onMessage(ws: WebSocket, bytes: ByteString) {
                 val bmp = BitmapFactory.decodeByteArray(bytes.toByteArray(), 0, bytes.size)
-                if (bmp != null) trySend(bmp)
+                if (bmp != null) trySend(StreamEvent.Frame(bmp))
             }
 
             override fun onClosing(ws: WebSocket, code: Int, reason: String) {
-                trySend(null)
+                trySend(StreamEvent.Closed)
             }
 
             override fun onFailure(ws: WebSocket, t: Throwable, response: Response?) {
-                Log.e(TAG, "WebSocket error", t)
-                trySend(null)
+                Log.e(TAG, "WebSocket error: ${t.message}", t)
+                trySend(StreamEvent.Error(t))
             }
         }
 

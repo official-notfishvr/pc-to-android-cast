@@ -60,11 +60,12 @@ Console.WriteLine();
 Console.WriteLine("  Use one of these IPs (phone must be on same network):");
 foreach (var ip in localIps)
 {
-    var note = ip.StartsWith("192.168.137.") ? " <- hotspot" : "";
+    var note = ip.StartsWith("192.168.137.") ? " <- use this when phone is on PC hotspot" : "";
     Console.WriteLine($"    ws://{ip}:{port}{note}");
 }
 Console.WriteLine();
-Console.WriteLine("  On your Android phone, enter the IP and port, then Connect.");
+Console.WriteLine("  On your Android phone: enter the IP and port, then Connect.");
+Console.WriteLine("  If connection times out: use the 192.168.137.1 IP when using PC hotspot.");
 Console.WriteLine("  Press Enter to stop.");
 Console.WriteLine();
 
@@ -181,6 +182,19 @@ static void HandleControl(string msg, int screenW, int screenH, int captureW, in
             mouse_event(b == 1 ? 0x0008 : 0x0002, 0, 0, 0, 0);
             mouse_event(b == 1 ? 0x0010 : 0x0004, 0, 0, 0, 0);
         }
+        else if (t == "k")
+        {
+            var keyCode = root.TryGetProperty("k", out var kp) ? kp.GetInt32() : 0;
+            var keyDown = root.TryGetProperty("d", out var dp) ? dp.GetInt32() : 1;
+            const uint KEYEVENTF_KEYUP = 2u;
+            if (keyDown != 0)
+            {
+                keybd_event((byte)(keyCode & 0xFF), 0, 0, 0);
+                keybd_event((byte)(keyCode & 0xFF), 0, KEYEVENTF_KEYUP, 0);
+            }
+            else
+                keybd_event((byte)(keyCode & 0xFF), 0, KEYEVENTF_KEYUP, 0);
+        }
     }
     catch { /* ignore parse errors */ }
 }
@@ -190,6 +204,9 @@ static extern bool SetCursorPos(int x, int y);
 
 [DllImport("user32.dll")]
 static extern void mouse_event(int dwFlags, int dx, int dy, int dwData, int dwExtraInfo);
+
+[DllImport("user32.dll")]
+static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
 
 static ImageCodecInfo? GetJpegEncoder()
 {
