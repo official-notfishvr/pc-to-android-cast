@@ -32,4 +32,15 @@
     <string name="use_same">Same as above</string>
     <string name="error_timeout">Connection timed out. Start the PC server and use the correct IP (e.g. 192.168.137.1 for hotspot).</string>
     <string name="error_generic">Connection failed: %1$s</string>
+    <string name="zoom_in">Zoom in</string>
+    <string name="zoom_out">Zoom out</string>
+    <string name="quick_actions">Quick actions</string>
+    <string name="copy">Copy</string>
+    <string name="paste">Paste</string>
+    <string name="select_all">Select all</string>
+    <string name="alt_tab">Alt+Tab</string>
+    <string name="task_mgr">Task mgr</string>
+    <string name="paste_from_phone">Paste from phone</string>
+    <string name="middle_click">Middle</string>
+    <string name="double_click">2× Click</string>
 </resources>

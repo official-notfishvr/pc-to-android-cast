@@ -48,6 +48,24 @@ internal static class ControlHandler
                 return;
             }
 
+            if (t == "dc")
+            {
+                Native.User32.GetCursorPos(out var pt);
+                Native.User32.mouse_event(0x0002, pt.X, pt.Y, 0, 0);
+                Native.User32.mouse_event(0x0004, pt.X, pt.Y, 0, 0);
+                Native.User32.mouse_event(0x0002, pt.X, pt.Y, 0, 0);
+                Native.User32.mouse_event(0x0004, pt.X, pt.Y, 0, 0);
+                return;
+            }
+
+            if (t == "cm")
+            {
+                Native.User32.GetCursorPos(out var pt);
+                Native.User32.mouse_event(0x0020, pt.X, pt.Y, 0, 0);
+                Native.User32.mouse_event(0x0040, pt.X, pt.Y, 0, 0);
+                return;
+            }
+
             int vpx, vpy;
             lock (viewport.Lock)
             {
@@ -69,29 +87,41 @@ internal static class ControlHandler
             {
                 var b = root.TryGetProperty("b", out var bp) ? bp.GetInt32() : 0;
                 Native.User32.SetCursorPos(screenX, screenY);
-                Native.User32.mouse_event(b == 1 ? 0x0008 : 0x0002, 0, 0, 0, 0);
-                Native.User32.mouse_event(b == 1 ? 0x0010 : 0x0004, 0, 0, 0, 0);
+                var (down, up) = GetMouseButtonFlags(b);
+                Native.User32.mouse_event(down, 0, 0, 0, 0);
+                Native.User32.mouse_event(up, 0, 0, 0, 0);
             }
             else if (t == "k")
             {
                 var keyCode = root.TryGetProperty("k", out var kp) ? kp.GetInt32() : 0;
                 var keyDown = root.TryGetProperty("d", out var dp) ? dp.GetInt32() : 1;
-                var ctrl = root.TryGetProperty("ctrl", out var cp) && cp.GetBoolean();
-                var alt = root.TryGetProperty("alt", out var ap) && ap.GetBoolean();
-                var win = root.TryGetProperty("win", out var wp) && wp.GetBoolean();
-                if (ctrl) Native.User32.keybd_event(0x11, 0, 0, 0);
-                if (alt) Native.User32.keybd_event(0x12, 0, 0, 0);
-                if (win) Native.User32.keybd_event(0x5B, 0, 0, 0);
-                if (keyDown != 0)
+                var ctrl = root.TryGetProperty("ctrl", out var ctrlEl) && ctrlEl.GetBoolean();
+                var alt = root.TryGetProperty("alt", out var altEl) && altEl.GetBoolean();
+                var win = root.TryGetProperty("win", out var winEl) && winEl.GetBoolean();
+                var shift = root.TryGetProperty("shift", out var shiftEl) && shiftEl.GetBoolean();
+                var vk = (byte)(keyCode & 0xFF);
+                const byte VK_CONTROL = 0x11, VK_MENU = 0x12, VK_LWIN = 0x5B, VK_SHIFT = 0x10;
+                var isModifier = vk == VK_CONTROL || vk == VK_MENU || vk == VK_LWIN || vk == VK_SHIFT;
+                if (!isModifier && keyDown != 0 && (ctrl || alt || win || shift))
                 {
-                    Native.User32.keybd_event((byte)(keyCode & 0xFF), 0, 0, 0);
-                    Native.User32.keybd_event((byte)(keyCode & 0xFF), 0, Native.User32.KEYEVENTF_KEYUP, 0);
+                    if (ctrl) Native.User32.keybd_event(VK_CONTROL, 0, 0, 0);
+                    if (shift) Native.User32.keybd_event(VK_SHIFT, 0, 0, 0);
+                    if (alt) Native.User32.keybd_event(VK_MENU, 0, 0, 0);
+                    if (win) Native.User32.keybd_event(VK_LWIN, 0, 0, 0);
+                    Native.User32.keybd_event(vk, 0, 0, 0);
+                    Native.User32.keybd_event(vk, 0, Native.User32.KEYEVENTF_KEYUP, 0);
+                    if (win) Native.User32.keybd_event(VK_LWIN, 0, Native.User32.KEYEVENTF_KEYUP, 0);
+                    if (alt) Native.User32.keybd_event(VK_MENU, 0, Native.User32.KEYEVENTF_KEYUP, 0);
+                    if (shift) Native.User32.keybd_event(VK_SHIFT, 0, Native.User32.KEYEVENTF_KEYUP, 0);
+                    if (ctrl) Native.User32.keybd_event(VK_CONTROL, 0, Native.User32.KEYEVENTF_KEYUP, 0);
                 }
                 else
-                    Native.User32.keybd_event((byte)(keyCode & 0xFF), 0, Native.User32.KEYEVENTF_KEYUP, 0);
-                if (win) Native.User32.keybd_event(0x5B, 0, Native.User32.KEYEVENTF_KEYUP, 0);
-                if (alt) Native.User32.keybd_event(0x12, 0, Native.User32.KEYEVENTF_KEYUP, 0);
-                if (ctrl) Native.User32.keybd_event(0x11, 0, Native.User32.KEYEVENTF_KEYUP, 0);
+                {
+                    if (keyDown != 0)
+                        Native.User32.keybd_event(vk, 0, 0, 0);
+                    else
+                        Native.User32.keybd_event(vk, 0, Native.User32.KEYEVENTF_KEYUP, 0);
+                }
             }
             else if (t == "u")
             {
@@ -119,6 +149,16 @@ internal static class ControlHandler
             var up = new Native.INPUT { type = 1, ki = new Native.KEYBDINPUT { wVk = 0, wScan = scan, dwFlags = Native.User32.KEYEVENTF_UNICODE | Native.User32.KEYEVENTF_KEYUP } };
             Native.User32.SendInput(2, new[] { down, up }, Marshal.SizeOf<Native.INPUT>());
         }
+    }
+
+    private static (int down, int up) GetMouseButtonFlags(int button)
+    {
+        return button switch
+        {
+            1 => (0x0008, 0x0010),  // right
+            2 => (0x0020, 0x0040),  // middle
+            _ => (0x0002, 0x0004)   // left
+        };
     }
 
     private static void DoScroll(int deltaX, int deltaY)

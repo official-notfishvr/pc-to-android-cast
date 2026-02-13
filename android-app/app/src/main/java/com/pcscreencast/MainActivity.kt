@@ -39,10 +39,7 @@ class MainActivity : AppCompatActivity() {
     private var fullCaptureHeight = 0
     private var currentCropRegion: IntArray? = null
     private var lastSentViewport: IntArray? = null
-    private var keyboardLastLength = 0
-    private var ctrlHeld = false
-    private var altHeld = false
-    private var winHeld = false
+    private var textInputLastLength = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -63,6 +60,8 @@ class MainActivity : AppCompatActivity() {
         binding.switchClicks.setOnCheckedChangeListener { _, checked -> streamView.enableClicks = checked }
         binding.switchTapRight.setOnCheckedChangeListener { _, checked -> streamView.tapIsRightClick = checked }
         binding.btnResetZoom.setOnClickListener { streamView.resetZoom() }
+        binding.btnZoomIn.setOnClickListener { streamView.zoomIn() }
+        binding.btnZoomOut.setOnClickListener { streamView.zoomOut() }
         streamView.onDoubleTapView = {
             val panel = binding.controlsPanel
             val overlay = binding.controlsDismissOverlay
@@ -84,18 +83,24 @@ class MainActivity : AppCompatActivity() {
             binding.controlsDismissOverlay.visibility = View.VISIBLE
         }
 
-        binding.btnKeyboard.setOnClickListener {
-            binding.keyboardOverlay.visibility = View.VISIBLE
-            binding.keyboardInput.requestFocus()
-            keyboardLastLength = 0
-            binding.keyboardInput.text?.clear()
+        binding.btnKeyboardToggle.setOnClickListener {
+            val container = binding.textInputOverlayContainer
+            if (container.visibility == View.VISIBLE) {
+                container.visibility = View.GONE
+                binding.textInput.clearFocus()
+            } else {
+                container.visibility = View.VISIBLE
+                binding.textInput.requestFocus()
+                textInputLastLength = 0
+                binding.textInput.text?.clear()
+            }
         }
-        binding.keyBtnClose.setOnClickListener {
-            binding.keyboardOverlay.visibility = View.GONE
-            binding.keyboardInput.clearFocus()
+        binding.btnTextInputClose.setOnClickListener {
+            binding.textInputOverlayContainer.visibility = View.GONE
+            binding.textInput.clearFocus()
         }
 
-        binding.keyboardInput.addTextChangedListener(object : TextWatcher {
+        binding.textInput.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
             override fun afterTextChanged(s: Editable?) {
@@ -103,41 +108,16 @@ class MainActivity : AppCompatActivity() {
                 val len = str.length
                 val stream = webSocketStream ?: return
                 when {
-                    len > keyboardLastLength -> {
-                        stream.sendUnicodeText(str.substring(keyboardLastLength))
+                    len > textInputLastLength -> {
+                        stream.sendUnicodeText(str.substring(textInputLastLength))
                     }
-                    len < keyboardLastLength -> {
-                        repeat(keyboardLastLength - len) { stream.sendKey(PcKeyCodes.VK_BACK, 1) }
+                    len < textInputLastLength -> {
+                        repeat(textInputLastLength - len) { stream.sendKeyTap(PcKeyCodes.VK_BACK) }
                     }
                 }
-                keyboardLastLength = len
+                textInputLastLength = len
             }
         })
-
-        fun sendKey(vk: Int) {
-            webSocketStream?.sendKey(vk, 1, ctrlHeld, altHeld, winHeld)
-        }
-        binding.keyBtnBackspace.setOnClickListener { sendKey(PcKeyCodes.VK_BACK) }
-        binding.keyBtnEnter.setOnClickListener { sendKey(PcKeyCodes.VK_RETURN) }
-        binding.keyBtnTab.setOnClickListener { sendKey(PcKeyCodes.VK_TAB) }
-        binding.keyBtnEsc.setOnClickListener { sendKey(PcKeyCodes.VK_ESCAPE) }
-        binding.keyBtnUp.setOnClickListener { sendKey(PcKeyCodes.VK_UP) }
-        binding.keyBtnDown.setOnClickListener { sendKey(PcKeyCodes.VK_DOWN) }
-        binding.keyBtnLeft.setOnClickListener { sendKey(PcKeyCodes.VK_LEFT) }
-        binding.keyBtnRight.setOnClickListener { sendKey(PcKeyCodes.VK_RIGHT) }
-
-        binding.keyBtnCtrl.setOnClickListener {
-            ctrlHeld = !ctrlHeld
-            webSocketStream?.sendKey(PcKeyCodes.VK_CONTROL, if (ctrlHeld) 1 else 0)
-        }
-        binding.keyBtnAlt.setOnClickListener {
-            altHeld = !altHeld
-            webSocketStream?.sendKey(PcKeyCodes.VK_MENU, if (altHeld) 1 else 0)
-        }
-        binding.keyBtnWin.setOnClickListener {
-            winHeld = !winHeld
-            webSocketStream?.sendKey(PcKeyCodes.VK_LWIN, if (winHeld) 1 else 0)
-        }
     }
 
     private fun connect() {
@@ -274,9 +254,9 @@ class MainActivity : AppCompatActivity() {
         if (show && !wasStreaming) {
             binding.controlsPanel.visibility = View.GONE
             binding.controlsDismissOverlay.visibility = View.GONE
-            binding.keyboardOverlay.visibility = View.GONE
+            binding.textInputOverlayContainer.visibility = View.GONE
         }
-        if (!show) binding.keyboardOverlay.visibility = View.GONE
+        if (!show) binding.textInputOverlayContainer.visibility = View.GONE
         setStreamingUi(show)
     }
 

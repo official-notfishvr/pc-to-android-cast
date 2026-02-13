@@ -6,11 +6,11 @@ internal static class Program
 {
     private static void Main(string[] args)
     {
-        ConsoleHelper.TryEnableAnsi();
-
         var options = ServerOptions.Parse(args);
         var localIps = NetworkHelper.GetAllLocalIpAddresses();
         NetworkHelper.TryAddFirewallRule(options.Port);
+
+        ServerUI.SetTitle("PC Screen Cast — Server");
 
         var server = new WebSocketServer($"ws://0.0.0.0:{options.Port}");
         server.Start(socket =>
@@ -18,9 +18,7 @@ internal static class Program
             socket.OnOpen = () =>
             {
                 var ip = socket.ConnectionInfo.ClientIpAddress;
-                ConsoleHelper.WriteColor($"[{DateTime.Now:HH:mm:ss}] ", 8);
-                ConsoleHelper.WriteColor("Client connected: ", 7);
-                ConsoleHelper.WriteColor($"{ip}\n", 10);
+                ServerUI.LogConnected(ip);
 
                 var bounds = System.Windows.Forms.SystemInformation.VirtualScreen;
                 var viewport = new ViewportState();
@@ -51,48 +49,17 @@ internal static class Program
             };
             socket.OnClose = () =>
             {
-                ConsoleHelper.WriteColor($"[{DateTime.Now:HH:mm:ss}] ", 8);
-                ConsoleHelper.WriteColor("Client disconnected: ", 7);
-                ConsoleHelper.WriteColor($"{socket.ConnectionInfo.ClientIpAddress}\n", 12);
+                ServerUI.LogDisconnected(socket.ConnectionInfo.ClientIpAddress);
             };
             socket.OnError = ex =>
             {
-                ConsoleHelper.WriteColor($"[{DateTime.Now:HH:mm:ss}] ", 8);
-                ConsoleHelper.WriteColor("WebSocket error: ", 12);
-                ConsoleHelper.WriteColor($"{ex.Message}\n", 12);
+                ServerUI.LogWebSocketError(ex.Message);
             };
         });
 
-        PrintBanner(options, localIps);
+        ServerUI.PrintBanner(options, localIps);
 
-        Console.ReadLine();
+        System.Console.ReadLine();
         server.Dispose();
-    }
-
-    private static void PrintBanner(ServerOptions options, IReadOnlyList<string> localIps)
-    {
-        ConsoleHelper.WriteLine();
-        ConsoleHelper.WriteColor("  ╔══════════════════════════════════════════╗\n", 14);
-        ConsoleHelper.WriteColor("  ║   PC Screen Cast — WebSocket Server      ║\n", 14);
-        ConsoleHelper.WriteColor("  ╚══════════════════════════════════════════╝\n", 14);
-        ConsoleHelper.WriteLine();
-        ConsoleHelper.WriteColor("  Endpoint: ", 7);
-        ConsoleHelper.WriteColor($"ws://<IP>:{options.Port}\n", 11);
-        ConsoleHelper.WriteColor($"  Quality {options.Quality}%  ·  FPS {options.Fps}  ·  Scale {options.Scale:P0}\n", 8);
-        ConsoleHelper.WriteLine();
-        ConsoleHelper.WriteColor("  Connect from Android using one of these (same network):\n", 8);
-        foreach (var ip in localIps)
-        {
-            var isHotspot = ip.StartsWith("192.168.137.");
-            ConsoleHelper.WriteColor($"    ", 8);
-            ConsoleHelper.WriteColor($"ws://{ip}:{options.Port}", isHotspot ? 10 : 11);
-            if (isHotspot) ConsoleHelper.WriteColor("  ← use this with PC hotspot\n", 10);
-            else ConsoleHelper.WriteLine();
-        }
-        ConsoleHelper.WriteLine();
-        ConsoleHelper.WriteColor("  Tip: On phone, enter the IP and port, then Connect.\n", 8);
-        ConsoleHelper.WriteColor("  Timeout? Use 192.168.137.1 when using PC hotspot.\n", 8);
-        ConsoleHelper.WriteColor("  Press Enter to stop the server.\n", 8);
-        ConsoleHelper.WriteLine();
     }
 }

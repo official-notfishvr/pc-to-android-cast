@@ -29,9 +29,7 @@ internal static class ScreenStreamService
         captureWidth = Math.Clamp(captureWidth, 1, bounds.Width);
         captureHeight = Math.Clamp(captureHeight, 1, bounds.Height);
 
-        ConsoleHelper.WriteColor($"[{DateTime.Now:HH:mm:ss}] ", 8);
-        ConsoleHelper.WriteColor($"Streaming {captureWidth}×{captureHeight} to ", 7);
-        ConsoleHelper.WriteColor($"{clientIp}\n", 10);
+        ServerUI.LogStreamingStart(clientIp, captureWidth, captureHeight);
 
         using var bitmap = new Bitmap(captureWidth, captureHeight, PixelFormat.Format24bppRgb);
         using var g = Graphics.FromImage(bitmap);
@@ -84,19 +82,14 @@ internal static class ScreenStreamService
 
                 frameCount++;
                 if (frameCount == 1)
-                {
-                    ConsoleHelper.WriteColor($"[{DateTime.Now:HH:mm:ss}] ", 8);
-                    ConsoleHelper.WriteColor($"First frame sent ({bytes.Length} bytes)\n", 10);
-                }
+                    ServerUI.LogFirstFrameSent(bytes.Length);
                 socket.Send(bytes);
                 await Task.Delay(TimeSpan.FromMilliseconds(1000.0 / fps));
             }
         }
         catch (Exception ex)
         {
-            ConsoleHelper.WriteColor($"[{DateTime.Now:HH:mm:ss}] ", 8);
-            ConsoleHelper.WriteColor($"Stream error for {clientIp}: ", 12);
-            ConsoleHelper.WriteColor($"{ex.Message}\n", 12);
+            ServerUI.LogStreamError(clientIp, ex.Message);
         }
     }
 }

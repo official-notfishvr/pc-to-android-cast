@@ -93,13 +93,27 @@ class WebSocketStream(
         webSocketRef.get()?.send(json)
     }
 
-    /** Send a key press (Windows VK code). keyDown: 1 = press+release, 0 = release only. */
-    fun sendKey(keyCode: Int, keyDown: Int = 1, ctrl: Boolean = false, alt: Boolean = false, win: Boolean = false) {
+    /** Send key down (keyDown=1) or key up (keyDown=0). Use for modifiers (hold/release) or with sendKeyTap. */
+    fun sendKey(keyCode: Int, keyDown: Int = 1, ctrl: Boolean = false, shift: Boolean = false, alt: Boolean = false, win: Boolean = false) {
         val c = if (ctrl) "true" else "false"
+        val s = if (shift) "true" else "false"
         val a = if (alt) "true" else "false"
         val w = if (win) "true" else "false"
-        val json = """{"t":"k","k":$keyCode,"d":$keyDown,"ctrl":$c,"alt":$a,"win":$w}"""
+        val json = """{"t":"k","k":$keyCode,"d":$keyDown,"ctrl":$c,"shift":$s,"alt":$a,"win":$w}"""
         webSocketRef.get()?.send(json)
+    }
+
+    /** Send key combo (e.g. Ctrl+C, Alt+Tab). */
+    fun sendKeyCombo(keyCode: Int, ctrl: Boolean = false, shift: Boolean = false, alt: Boolean = false, win: Boolean = false) {
+        sendKey(keyCode, 1, ctrl, shift, alt, win)
+    }
+
+    /** Send key down then key up (one tap). Use for non-modifier keys when you want a single key press. */
+    fun sendKeyTap(keyCode: Int) {
+        webSocketRef.get()?.let { ws ->
+            ws.send("""{"t":"k","k":$keyCode,"d":1,"ctrl":false,"alt":false,"win":false}""")
+            ws.send("""{"t":"k","k":$keyCode,"d":0,"ctrl":false,"alt":false,"win":false}""")
+        }
     }
 
     /** Send Unicode text (for IME / on-screen keyboard input). */
@@ -107,6 +121,16 @@ class WebSocketStream(
         if (text.isEmpty()) return
         val json = JSONObject().apply { put("t", "u"); put("s", text) }.toString()
         webSocketRef.get()?.send(json)
+    }
+
+    /** Send double-click at current cursor position. */
+    fun sendDoubleClick() {
+        webSocketRef.get()?.send("""{"t":"dc"}""")
+    }
+
+    /** Send middle click at current cursor position. */
+    fun sendMiddleClick() {
+        webSocketRef.get()?.send("""{"t":"cm"}""")
     }
 
     /** Send scroll delta (e.g. dy=1 for scroll down, dy=-1 for scroll up). */
