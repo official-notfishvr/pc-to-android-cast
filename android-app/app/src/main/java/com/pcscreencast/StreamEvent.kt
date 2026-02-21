@@ -7,6 +7,7 @@ import android.graphics.Bitmap
  */
 sealed class StreamEvent {
     data class Frame(val bitmap: Bitmap) : StreamEvent()
+    data class Message(val text: String) : StreamEvent()
     data class Error(val throwable: Throwable) : StreamEvent()
     object Closed : StreamEvent()
 }

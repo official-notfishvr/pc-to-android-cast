@@ -2,6 +2,7 @@ package com.pcscreencast
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.os.Build
 import android.util.Log
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -30,7 +31,9 @@ data class StreamConfigData(
  */
 class WebSocketStream(
     private val url: String,
-    private val initialConfig: StreamConfigData? = null
+    private val initialConfig: StreamConfigData? = null,
+    private val deviceId: String? = null,
+    private val deviceName: String? = null
 ) {
 
     companion object {
@@ -53,9 +56,17 @@ class WebSocketStream(
             override fun onOpen(ws: WebSocket, response: Response) {
                 webSocketRef.set(ws)
                 Log.d(TAG, "Connected")
+                sendHello(
+                    id = deviceId,
+                    name = deviceName ?: (Build.MODEL ?: "Android")
+                )
                 initialConfig?.let { c ->
                     sendConfig(c.scale, c.quality, c.fps, c.qualityZoomed, c.fpsZoomed)
                 }
+            }
+
+            override fun onMessage(ws: WebSocket, text: String) {
+                trySend(StreamEvent.Message(text))
             }
 
             override fun onMessage(ws: WebSocket, bytes: ByteString) {
@@ -81,6 +92,23 @@ class WebSocketStream(
             client.dispatcher.executorService.shutdown()
             client.connectionPool.evictAll()
         }
+    }
+
+    fun sendHello(id: String? = null, name: String? = null) {
+        val json = JSONObject().apply {
+            put("t", "hello")
+            if (!id.isNullOrEmpty()) put("deviceId", id)
+            if (!name.isNullOrEmpty()) put("name", name)
+        }.toString()
+        webSocketRef.get()?.send(json)
+    }
+
+    fun sendAuth(pin: String) {
+        val json = JSONObject().apply {
+            put("t", "auth")
+            put("pin", pin)
+        }.toString()
+        webSocketRef.get()?.send(json)
     }
 
     fun sendControl(type: String, x: Int, y: Int, button: Int = 0) {
@@ -145,6 +173,31 @@ class WebSocketStream(
         val qz = qualityZoomed ?: 0
         val fz = fpsZoomed ?: 0
         val json = """{"t":"config","scale":$scale,"quality":$quality,"fps":$fps,"qualityZoomed":$qz,"fpsZoomed":$fz}"""
+        webSocketRef.get()?.send(json)
+    }
+
+    fun fsList(path: String = "") {
+        val json = JSONObject().apply {
+            put("t", "fs_list")
+            put("path", path)
+        }.toString()
+        webSocketRef.get()?.send(json)
+    }
+
+    fun fsGet(path: String) {
+        val json = JSONObject().apply {
+            put("t", "fs_get")
+            put("path", path)
+        }.toString()
+        webSocketRef.get()?.send(json)
+    }
+
+    fun fsPut(path: String, base64Data: String) {
+        val json = JSONObject().apply {
+            put("t", "fs_put")
+            put("path", path)
+            put("data", base64Data)
+        }.toString()
         webSocketRef.get()?.send(json)
     }
 }

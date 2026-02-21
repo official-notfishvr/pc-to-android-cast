@@ -43,4 +43,14 @@
     <string name="paste_from_phone">Paste from phone</string>
     <string name="middle_click">Middle</string>
     <string name="double_click">2× Click</string>
+    <string name="pairing_required">Pairing required</string>
+    <string name="hint_pin">PIN</string>
+    <string name="pair">Pair</string>
+    <string name="media">Media</string>
+    <string name="vol_up">Vol+</string>
+    <string name="vol_down">Vol-</string>
+    <string name="mute">Mute</string>
+    <string name="prev">Prev</string>
+    <string name="play_pause">Play</string>
+    <string name="next">Next</string>
 </resources>

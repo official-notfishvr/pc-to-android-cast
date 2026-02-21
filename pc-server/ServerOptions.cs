@@ -7,6 +7,9 @@ internal sealed class ServerOptions
     public int Fps { get; set; } = 20;
     public double Scale { get; set; } = 1.0;
 
+    public bool RequireAuth { get; set; } = true;
+    public string? PairingPin { get; set; }
+
     public TimeSpan FrameInterval => TimeSpan.FromMilliseconds(1000.0 / Fps);
 
     public static ServerOptions Parse(string[] args)
@@ -18,6 +21,8 @@ internal sealed class ServerOptions
             if (args[i] == "--quality" && int.TryParse(args[i + 1], out var q)) opts.Quality = Math.Clamp(q, 1, 100);
             if (args[i] == "--fps" && int.TryParse(args[i + 1], out var f)) opts.Fps = Math.Clamp(f, 1, 60);
             if (args[i] == "--scale" && double.TryParse(args[i + 1].Replace(",", "."), out var s)) opts.Scale = Math.Clamp(s, 0.25, 1.0);
+            if (args[i] == "--requireAuth" && bool.TryParse(args[i + 1], out var ra)) opts.RequireAuth = ra;
+            if (args[i] == "--pin") opts.PairingPin = args[i + 1];
         }
         return opts;
     }
